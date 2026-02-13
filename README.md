@@ -27,13 +27,9 @@ Set `DATABASE_URL` in your Vercel project (for example from Vercel Postgres, Neo
 
 If `DATABASE_URL` is not set, filesystem writes fall back to `/tmp/golf-game-improvement` on Vercel, which is ephemeral and can lose data between cold starts/redeploys.
 
-## AI routine generation
+## Routine generation
 
-To enable AI-generated routines, set:
-- `OPENAI_API_KEY` (required for AI generation)
-- `OPENAI_MODEL` (optional, defaults to `gpt-4o-mini`)
-
-If `OPENAI_API_KEY` is missing or the AI response is invalid, the server automatically falls back to the built-in deterministic routine generator.
+Routines are generated entirely by the built-in rules engine (no AI provider or API key required).
 
 ## Super user bootstrap
 

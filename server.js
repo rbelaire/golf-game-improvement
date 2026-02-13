@@ -7,8 +7,6 @@ const PORT = process.env.PORT || 3000;
 const DB_DIR = process.env.DB_DIR || (process.env.VERCEL ? "/tmp/golf-game-improvement" : path.join(__dirname, "data"));
 const DB_PATH = path.join(DB_DIR, "db.json");
 const DATABASE_URL = process.env.DATABASE_URL || "";
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
-const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
 const SUPER_USER_EMAIL = String(process.env.SUPER_USER_EMAIL || "").trim().toLowerCase();
 const SUPER_USER_PASSWORD = String(process.env.SUPER_USER_PASSWORD || "");
 
@@ -256,55 +254,192 @@ function normalizeProfile(profile) {
   };
 }
 
-function focusMapByWeakness(weakness) {
-  const mapping = {
-    "Driving accuracy": ["fairway finder drill", "launch window control", "pressure tee shots"],
-    "Approach consistency": ["distance ladder work", "shot-shape rehearsal", "target proximity challenge"],
-    "Short game touch": ["landing zone precision", "up-and-down circuits", "bunker variability"],
-    "Putting confidence": ["start-line gate drill", "3-6-9 pressure ladder", "green reading reps"],
-    "Course management": ["club selection simulation", "risk/reward decision reps", "post-round strategy review"]
+const DRILL_LIBRARY = [
+  { id: "drv-fairway-gates", name: "Fairway Gates Ladder", weaknesses: ["Driving accuracy"], type: "technical", levels: ["beginner", "intermediate", "advanced"] },
+  { id: "drv-start-line-spray", name: "Start-Line Spray Audit", weaknesses: ["Driving accuracy"], type: "technical", levels: ["intermediate", "advanced"] },
+  { id: "drv-tee-pressure", name: "One-Ball Tee Pressure", weaknesses: ["Driving accuracy"], type: "pressure", levels: ["beginner", "intermediate", "advanced"] },
+  { id: "drv-window-control", name: "Launch Window Control", weaknesses: ["Driving accuracy"], type: "technical", levels: ["intermediate", "advanced"] },
+  { id: "drv-fairway-9shot", name: "9-Hole Fairway Keeper", weaknesses: ["Driving accuracy"], type: "transfer", levels: ["beginner", "intermediate", "advanced"] },
+  { id: "app-wedge-ladder", name: "Wedge Distance Ladder", weaknesses: ["Approach consistency"], type: "technical", levels: ["beginner", "intermediate", "advanced"] },
+  { id: "app-face-strike-grid", name: "Face Strike Grid", weaknesses: ["Approach consistency"], type: "technical", levels: ["intermediate", "advanced"] },
+  { id: "app-shot-shape-alternating", name: "Alternating Shape Reps", weaknesses: ["Approach consistency"], type: "technical", levels: ["advanced", "intermediate"] },
+  { id: "app-proximity-challenge", name: "Proximity Circle Challenge", weaknesses: ["Approach consistency"], type: "pressure", levels: ["beginner", "intermediate", "advanced"] },
+  { id: "app-approach-9hole", name: "Approach Simulation 9", weaknesses: ["Approach consistency"], type: "transfer", levels: ["beginner", "intermediate", "advanced"] },
+  { id: "sg-landing-zones", name: "Landing Zone Towel Matrix", weaknesses: ["Short game touch"], type: "technical", levels: ["beginner", "intermediate", "advanced"] },
+  { id: "sg-updown-circuit", name: "Up-and-Down Circuit", weaknesses: ["Short game touch"], type: "pressure", levels: ["beginner", "intermediate", "advanced"] },
+  { id: "sg-bunker-variability", name: "Bunker Variability Reps", weaknesses: ["Short game touch"], type: "technical", levels: ["intermediate", "advanced"] },
+  { id: "sg-random-lie-scramble", name: "Random Lie Scramble", weaknesses: ["Short game touch"], type: "transfer", levels: ["intermediate", "advanced"] },
+  { id: "sg-wedge-clock", name: "Wedge Clock System", weaknesses: ["Short game touch"], type: "technical", levels: ["beginner", "intermediate"] },
+  { id: "putt-gate-startline", name: "Start Line Gate", weaknesses: ["Putting confidence"], type: "technical", levels: ["beginner", "intermediate", "advanced"] },
+  { id: "putt-ladder-369", name: "3-6-9 Pressure Ladder", weaknesses: ["Putting confidence"], type: "pressure", levels: ["beginner", "intermediate", "advanced"] },
+  { id: "putt-read-compare", name: "Read-and-React Compare", weaknesses: ["Putting confidence"], type: "technical", levels: ["intermediate", "advanced"] },
+  { id: "putt-make-10-row", name: "Make 10 in a Row", weaknesses: ["Putting confidence"], type: "pressure", levels: ["beginner", "intermediate"] },
+  { id: "putt-par18", name: "Par-18 Putting Game", weaknesses: ["Putting confidence"], type: "transfer", levels: ["beginner", "intermediate", "advanced"] },
+  { id: "cm-club-selection-tree", name: "Club Selection Decision Tree", weaknesses: ["Course management"], type: "technical", levels: ["beginner", "intermediate", "advanced"] },
+  { id: "cm-risk-reward-log", name: "Risk/Reward Decision Log", weaknesses: ["Course management"], type: "technical", levels: ["intermediate", "advanced"] },
+  { id: "cm-miss-map", name: "Miss Map Strategy", weaknesses: ["Course management"], type: "technical", levels: ["beginner", "intermediate", "advanced"] },
+  { id: "cm-3ball-choices", name: "3-Ball Choice Test", weaknesses: ["Course management"], type: "pressure", levels: ["intermediate", "advanced"] },
+  { id: "cm-post-round-audit", name: "Post-Round Audit Loop", weaknesses: ["Course management"], type: "transfer", levels: ["beginner", "intermediate", "advanced"] },
+  { id: "base-mobility-sequence", name: "Mobility and Tempo Sequence", weaknesses: ["Driving accuracy", "Approach consistency", "Short game touch", "Putting confidence", "Course management"], type: "warmup", levels: ["beginner", "intermediate", "advanced"] },
+  { id: "base-contact-baseline", name: "Contact Baseline Check", weaknesses: ["Driving accuracy", "Approach consistency"], type: "warmup", levels: ["beginner", "intermediate", "advanced"] },
+  { id: "base-pre-shot-routine", name: "Pre-Shot Routine Rehearsal", weaknesses: ["Driving accuracy", "Approach consistency", "Short game touch", "Putting confidence", "Course management"], type: "transfer", levels: ["beginner", "intermediate", "advanced"] },
+  { id: "base-score-target", name: "Score Target Challenge", weaknesses: ["Driving accuracy", "Approach consistency", "Short game touch", "Putting confidence", "Course management"], type: "pressure", levels: ["beginner", "intermediate", "advanced"] },
+  { id: "base-recovery-shots", name: "Recovery Shot Scenarios", weaknesses: ["Course management", "Approach consistency"], type: "transfer", levels: ["intermediate", "advanced"] }
+];
+
+function randomIndex(max) {
+  return max <= 1 ? 0 : crypto.randomInt(0, max);
+}
+
+function handicapBand(handicap) {
+  if (handicap.includes("Beginner")) return "beginner";
+  if (handicap.includes("Intermediate")) return "intermediate";
+  return "advanced";
+}
+
+function intensityLabel(handicap) {
+  if (handicap.includes("Beginner")) return "Fundamentals and confidence";
+  if (handicap.includes("Intermediate")) return "Consistency and pressure adaptation";
+  return "Scoring optimization and performance";
+}
+
+function weekTheme(weakness, week) {
+  const themes = {
+    "Driving accuracy": ["Dispersion Control", "Start-Line Commitment", "Pressure Tee Shots", "Course Transfer"],
+    "Approach consistency": ["Contact and Flight", "Distance Precision", "Shot Decision Speed", "Scoring Transfer"],
+    "Short game touch": ["Landing Control", "Trajectory Variety", "Scramble Pressure", "On-Course Conversion"],
+    "Putting confidence": ["Start-Line Ownership", "Pace Reliability", "Short-Putt Pressure", "Scoring Transfer"],
+    "Course management": ["Decision Framework", "Risk Discipline", "Miss Pattern Planning", "Round Simulation"]
   };
-  return mapping[weakness] || ["full swing calibration", "short game fundamentals", "mental reset routine"];
+  const bucket = themes[weakness] || ["Foundation", "Consistency", "Pressure", "Transfer"];
+  return bucket[(week - 1) % bucket.length];
 }
 
-function intensityForHandicap(handicap) {
-  if (handicap.includes("Beginner")) return "Fundamentals first";
-  if (handicap.includes("Intermediate")) return "Skill consolidation";
-  return "Performance sharpening";
+function extractRecentDrillIds(savedRoutines) {
+  const recent = new Set();
+  const recentRoutines = (savedRoutines || []).slice(0, 6);
+  for (const routine of recentRoutines) {
+    for (const week of routine.weeks || []) {
+      for (const session of week.sessions || []) {
+        for (const drillId of session.drillIds || []) {
+          if (drillId) recent.add(drillId);
+        }
+      }
+    }
+  }
+  return recent;
 }
 
-function buildSessionBlock(dayIndex, profile, focusAreas) {
+function candidateScore(drill, weakness, band, usedInPlan, recentDrills, preferredType) {
+  let score = 0;
+  if (drill.weaknesses.includes(weakness)) score += 4;
+  if (drill.levels.includes(band)) score += 3;
+  if (drill.type === preferredType) score += 2.5;
+  if (usedInPlan.has(drill.id)) score -= 4;
+  if (recentDrills.has(drill.id)) score -= 2;
+  score += (randomIndex(100) / 100) * 1.2;
+  return score;
+}
+
+function pickDrill({ weakness, band, preferredType, usedInPlan, recentDrills, excludedIds }) {
+  const candidates = DRILL_LIBRARY.filter(
+    (drill) => !excludedIds.has(drill.id) && drill.levels.includes(band) && (drill.weaknesses.includes(weakness) || drill.weaknesses.length > 2)
+  );
+  if (!candidates.length) return null;
+
+  let best = candidates[0];
+  let bestScore = -Infinity;
+  for (const drill of candidates) {
+    const score = candidateScore(drill, weakness, band, usedInPlan, recentDrills, preferredType);
+    if (score > bestScore) {
+      best = drill;
+      bestScore = score;
+    }
+  }
+  return best;
+}
+
+function buildSessionBullets({ profile, week, sessionNumber, chosenDrills }) {
   const totalMinutes = Math.round(profile.hoursPerSession * 60);
-  const warmUp = Math.max(10, Math.round(totalMinutes * 0.15));
-  const core = Math.max(20, Math.round(totalMinutes * 0.6));
-  const performance = Math.max(10, totalMinutes - warmUp - core);
-  const focus = focusAreas[dayIndex % focusAreas.length];
+  const warmUp = Math.max(10, Math.round(totalMinutes * 0.18));
+  const technical = Math.max(18, Math.round(totalMinutes * 0.36));
+  const pressure = Math.max(14, Math.round(totalMinutes * 0.24));
+  const transfer = Math.max(10, totalMinutes - warmUp - technical - pressure);
+  const [drillA, drillB, drillC] = chosenDrills;
+  const reflectionPrompts = [
+    "write one pattern you corrected and one miss that still shows up",
+    "note a decisive swing/putt thought you will keep tomorrow",
+    "record score vs target and the adjustment for next session",
+    "capture one strategic decision you executed well"
+  ];
   return [
-    `${warmUp} min warm-up: mobility + tempo swings + putting pace check.`,
-    `${core} min core skill focus: ${focus}.`,
-    `${performance} min transfer segment: on-course simulation and score target challenge.`,
-    "5 min reflection: journal one win, one weakness, one adjustment for next session."
+    `${warmUp} min warm-up: ${drillA.name}.`,
+    `${technical} min technical block: ${drillB.name} with target-based reps and tracked outcomes.`,
+    `${pressure} min pressure block: ${drillC.name} under consequence scoring.`,
+    `${transfer} min transfer block: simulate real-hole decisions before each shot.`,
+    `5 min reflection: ${reflectionPrompts[randomIndex(reflectionPrompts.length)]}.`
   ];
 }
 
-function buildDeterministicRoutine(profileInput) {
+function buildRulesRoutine(profileInput, savedRoutines = []) {
   const profile = normalizeProfile(profileInput);
-  const focusAreas = focusMapByWeakness(profile.weakness);
-  const intensity = intensityForHandicap(profile.handicap);
+  const band = handicapBand(profile.handicap);
+  const intensity = intensityLabel(profile.handicap);
+  const recentDrills = extractRecentDrillIds(savedRoutines);
+  const usedInPlan = new Set();
   const weeks = [];
+  const weekCount = 4;
 
-  for (let week = 1; week <= 4; week += 1) {
+  for (let week = 1; week <= weekCount; week += 1) {
     const sessions = [];
     for (let day = 1; day <= profile.daysPerWeek; day += 1) {
+      const excludedIds = new Set();
+      const warmupDrill = pickDrill({
+        weakness: profile.weakness,
+        band,
+        preferredType: "warmup",
+        usedInPlan,
+        recentDrills,
+        excludedIds
+      }) || DRILL_LIBRARY[0];
+      excludedIds.add(warmupDrill.id);
+      const technicalDrill = pickDrill({
+        weakness: profile.weakness,
+        band,
+        preferredType: "technical",
+        usedInPlan,
+        recentDrills,
+        excludedIds
+      }) || warmupDrill;
+      excludedIds.add(technicalDrill.id);
+      const pressureDrill = pickDrill({
+        weakness: profile.weakness,
+        band,
+        preferredType: "pressure",
+        usedInPlan,
+        recentDrills,
+        excludedIds
+      }) || technicalDrill;
+
+      usedInPlan.add(warmupDrill.id);
+      usedInPlan.add(technicalDrill.id);
+      usedInPlan.add(pressureDrill.id);
+
       sessions.push({
         title: `Session ${day}`,
-        bullets: buildSessionBlock(day + week, profile, focusAreas)
+        bullets: buildSessionBullets({
+          profile,
+          week,
+          sessionNumber: day,
+          chosenDrills: [warmupDrill, technicalDrill, pressureDrill]
+        }),
+        drillIds: [warmupDrill.id, technicalDrill.id, pressureDrill.id]
       });
     }
 
     weeks.push({
       week,
-      headline: `Week ${week}: ${intensity}`,
+      headline: `Week ${week}: ${weekTheme(profile.weakness, week)} (${intensity})`,
       sessions
     });
   }
@@ -315,114 +450,6 @@ function buildDeterministicRoutine(profileInput) {
     meta: `${profile.handicap} • ${profile.daysPerWeek} days/week • ${profile.hoursPerSession} hr/session`,
     weeks
   };
-}
-
-function isValidRoutine(routine) {
-  if (!routine || typeof routine !== "object") return false;
-  if (!asString(routine.title) || !asString(routine.meta)) return false;
-  if (!Array.isArray(routine.weeks) || routine.weeks.length === 0) return false;
-
-  for (const week of routine.weeks) {
-    if (!week || typeof week !== "object") return false;
-    if (!Number.isInteger(week.week) || week.week < 1) return false;
-    if (!asString(week.headline)) return false;
-    if (!Array.isArray(week.sessions) || week.sessions.length === 0) return false;
-    for (const session of week.sessions) {
-      if (!session || typeof session !== "object") return false;
-      if (!asString(session.title)) return false;
-      if (!Array.isArray(session.bullets) || session.bullets.length === 0) return false;
-      if (session.bullets.some((bullet) => !asString(bullet))) return false;
-    }
-  }
-
-  return true;
-}
-
-function normalizeRoutine(profile, routine) {
-  return {
-    profileSnapshot: profile,
-    title: asString(routine.title),
-    meta: asString(routine.meta),
-    weeks: routine.weeks.map((week, index) => ({
-      week: Number.isInteger(week.week) && week.week > 0 ? week.week : index + 1,
-      headline: asString(week.headline),
-      sessions: week.sessions.map((session, sessionIndex) => ({
-        title: asString(session.title) || `Session ${sessionIndex + 1}`,
-        bullets: session.bullets.map((bullet) => asString(bullet))
-      }))
-    }))
-  };
-}
-
-async function generateRoutineWithAi(profile) {
-  const systemPrompt = [
-    "You are a golf performance coach. Return strict JSON only.",
-    "Design a practical routine based on the golfer profile.",
-    "No markdown, no code fences, no extra keys."
-  ].join(" ");
-  const userPrompt = JSON.stringify({
-    task: "Generate a routine",
-    outputShape: {
-      title: "string",
-      meta: "string",
-      weeks: [
-        {
-          week: "number",
-          headline: "string",
-          sessions: [{ title: "string", bullets: ["string"] }]
-        }
-      ]
-    },
-    constraints: [
-      "Plan should match requested daysPerWeek and hoursPerSession",
-      "4 to 6 weeks total",
-      "Each session should include 3 to 5 concise bullets",
-      "Tailor drills to stated weakness and handicap",
-      "Keep language actionable"
-    ],
-    profile
-  });
-
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${OPENAI_API_KEY}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      model: OPENAI_MODEL,
-      temperature: 0.7,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt }
-      ]
-    })
-  });
-
-  if (!response.ok) {
-    const message = await response.text();
-    throw new Error(`AI provider error (${response.status}): ${message.slice(0, 300)}`);
-  }
-
-  const payload = await response.json();
-  const content = payload?.choices?.[0]?.message?.content;
-  if (!content || typeof content !== "string") {
-    throw new Error("AI provider returned no content.");
-  }
-
-  let parsed;
-  try {
-    parsed = JSON.parse(content);
-  } catch (_err) {
-    throw new Error("AI response was not valid JSON.");
-  }
-
-  if (!isValidRoutine(parsed)) {
-    throw new Error("AI response did not match routine schema.");
-  }
-
-  return normalizeRoutine(profile, parsed);
 }
 
 async function handleApi(req, res, url) {
@@ -595,32 +622,8 @@ async function handleApi(req, res, url) {
       }
 
       const profile = normalizeProfile(body.profile);
-      let routine = null;
-      let source = "fallback";
-      let fallbackReason = "";
-
-      if (OPENAI_API_KEY) {
-        try {
-          routine = await generateRoutineWithAi(profile);
-          source = "ai";
-        } catch (err) {
-          fallbackReason = err.message || "Unknown AI generation error.";
-          console.error("AI routine generation failed, using fallback:", err.message);
-        }
-      } else {
-        fallbackReason = "OPENAI_API_KEY is not configured on the server.";
-      }
-
-      if (!routine) {
-        routine = buildDeterministicRoutine(profile);
-      }
-
-      const responsePayload = { routine, source };
-      if (source === "fallback" && isSuperUser(auth.user) && fallbackReason) {
-        responsePayload.fallbackReason = fallbackReason;
-      }
-
-      sendJson(res, 200, responsePayload);
+      const routine = buildRulesRoutine(profile, auth.user.routines || []);
+      sendJson(res, 200, { routine, source: "rules" });
       return;
     } catch (err) {
       sendJson(res, 400, { error: err.message });

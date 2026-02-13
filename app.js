@@ -508,12 +508,7 @@ profileForm.addEventListener("submit", async (event) => {
     });
     currentRoutine = generation.routine;
     renderRoutine(currentRoutine);
-    if (generation.source === "ai") {
-      setMessage("AI routine generated. Save it when ready.");
-    } else {
-      const reason = generation.fallbackReason ? ` Reason: ${generation.fallbackReason}` : "";
-      setMessage(`Routine generated with fallback engine. Save it when ready.${reason}`);
-    }
+    setMessage("Routine generated with smart rules engine. Save it when ready.");
   } catch (err) {
     setMessage(err.message, true);
   }
