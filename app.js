@@ -24,6 +24,7 @@ const welcomePanel = document.getElementById("welcomePanel");
 const welcomeName = document.getElementById("welcomeName");
 const welcomeMessage = document.getElementById("welcomeMessage");
 const topLogoutBtn = document.getElementById("topLogoutBtn");
+const topMessage = document.getElementById("topMessage");
 const saveRoutineBtn = document.getElementById("saveRoutineBtn");
 const customRoutineForm = document.getElementById("customRoutineForm");
 const upgradeBtn = document.getElementById("upgradeBtn");
@@ -92,6 +93,9 @@ async function api(path, options = {}) {
 function setMessage(message, isError = false) {
   appMessage.textContent = message;
   appMessage.classList.toggle("error", isError);
+  topMessage.textContent = message;
+  topMessage.classList.toggle("error", isError);
+  topMessage.classList.toggle("hidden", !currentUser || !message);
 }
 
 function getProfileFromForm() {
@@ -335,9 +339,11 @@ function updateAuthUi() {
   if (isAuthed) {
     welcomeName.textContent = currentUser.name;
     welcomeMessage.textContent = `Let's get better today ${currentUser.name}`;
+    topMessage.classList.toggle("hidden", !topMessage.textContent);
   } else {
     welcomeName.textContent = "";
     welcomeMessage.textContent = "";
+    topMessage.classList.add("hidden");
   }
   lockPlanner(!isAuthed);
   renderUsage();

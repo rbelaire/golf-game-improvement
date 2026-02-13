@@ -73,6 +73,17 @@ body {
   font-size: 0.85rem;
 }
 
+.top-message {
+  margin: 0;
+  max-width: 420px;
+  color: #d3f0d6;
+  font-size: 0.85rem;
+}
+
+.top-message.error {
+  color: #ff7c7c;
+}
+
 .brand-tag {
   margin: 0;
   letter-spacing: 0.1em;
