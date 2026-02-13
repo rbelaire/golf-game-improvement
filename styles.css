@@ -117,8 +117,14 @@ h2 {
 
 .auth-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.9rem;
+}
+
+.auth-grid .cta-row {
+  grid-column: 1 / -1;
+  justify-content: flex-start;
+  flex-wrap: wrap;
 }
 
 .app-message {

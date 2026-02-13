@@ -30,8 +30,8 @@
         </div>
 
         <form id="authForm" class="form-stack auth-grid">
-          <label>
-            Name (for register)
+          <label id="registerNameField" class="hidden">
+            Name
             <input type="text" id="accountName" placeholder="Jordan Lee" />
           </label>
           <label>
@@ -40,12 +40,14 @@
           </label>
           <label>
             Password
-            <input type="password" id="accountPassword" placeholder="At least 8 characters" required />
+              <input type="password" id="accountPassword" placeholder="At least 8 characters" required />
           </label>
           <div class="cta-row">
-            <button id="registerBtn" class="btn btn-primary" type="button">Register</button>
-            <button id="loginBtn" class="btn btn-outline" type="button">Login</button>
-            <button id="logoutBtn" class="btn btn-danger" type="button">Logout</button>
+            <button id="registerBtn" class="btn btn-primary hidden" type="button">Create Account</button>
+            <button id="loginBtn" class="btn btn-primary" type="button">Login</button>
+            <button id="showRegisterBtn" class="btn btn-outline" type="button">Register</button>
+            <button id="showLoginBtn" class="btn btn-outline hidden" type="button">Back to Login</button>
+            <button id="logoutBtn" class="btn btn-danger hidden" type="button">Logout</button>
           </div>
         </form>
         <p id="appMessage" class="app-message" aria-live="polite"></p>

@@ -5,12 +5,16 @@ const STORAGE_KEYS = {
 
 const authStatus = document.getElementById("authStatus");
 const appMessage = document.getElementById("appMessage");
+const authForm = document.getElementById("authForm");
 const accountNameInput = document.getElementById("accountName");
 const accountEmailInput = document.getElementById("accountEmail");
 const accountPasswordInput = document.getElementById("accountPassword");
 const registerBtn = document.getElementById("registerBtn");
 const loginBtn = document.getElementById("loginBtn");
 const logoutBtn = document.getElementById("logoutBtn");
+const showRegisterBtn = document.getElementById("showRegisterBtn");
+const showLoginBtn = document.getElementById("showLoginBtn");
+const registerNameField = document.getElementById("registerNameField");
 
 const profileForm = document.getElementById("profileForm");
 const clearProfileBtn = document.getElementById("clearProfileBtn");
@@ -33,6 +37,7 @@ const savedRoutineTemplate = document.getElementById("savedRoutineTemplate");
 let currentRoutine = null;
 let currentUser = null;
 let savedRoutines = [];
+let isRegisterMode = false;
 const FREE_ROUTINE_LIMIT = 5;
 
 function getToken() {
@@ -147,6 +152,28 @@ function renderUsage() {
   } else {
     usageText.textContent = `${count}/${limit} saved routines used (generated + custom combined).`;
     upgradeBtn.classList.remove("hidden");
+  }
+}
+
+function setAuthMode(registerMode) {
+  isRegisterMode = registerMode;
+  const isAuthed = Boolean(currentUser);
+
+  registerNameField.classList.toggle("hidden", !registerMode || isAuthed);
+  registerBtn.classList.toggle("hidden", !registerMode || isAuthed);
+  showLoginBtn.classList.toggle("hidden", !registerMode || isAuthed);
+
+  loginBtn.classList.toggle("hidden", registerMode || isAuthed);
+  showRegisterBtn.classList.toggle("hidden", registerMode || isAuthed);
+  logoutBtn.classList.toggle("hidden", !isAuthed);
+
+  accountNameInput.required = registerMode && !isAuthed;
+  accountNameInput.disabled = !registerMode || isAuthed;
+  accountEmailInput.disabled = isAuthed;
+  accountPasswordInput.disabled = isAuthed;
+
+  if (!registerMode) {
+    accountNameInput.value = "";
   }
 }
 
@@ -296,7 +323,7 @@ async function loadUserData() {
 function updateAuthUi() {
   const isAuthed = Boolean(currentUser);
   authStatus.textContent = isAuthed ? `Signed in as ${currentUser.name}` : "Not signed in";
-  logoutBtn.disabled = !isAuthed;
+  setAuthMode(isAuthed ? false : isRegisterMode);
   lockPlanner(!isAuthed);
   renderUsage();
 }
@@ -360,6 +387,7 @@ async function logout() {
   }
 
   clearToken();
+  isRegisterMode = false;
   currentUser = null;
   savedRoutines = [];
   hydrateForm(null);
@@ -411,6 +439,25 @@ function buildCustomRoutine() {
 registerBtn.addEventListener("click", register);
 loginBtn.addEventListener("click", login);
 logoutBtn.addEventListener("click", logout);
+showRegisterBtn.addEventListener("click", () => {
+  setAuthMode(true);
+  setMessage("Enter your name, email, and password to create an account.");
+});
+showLoginBtn.addEventListener("click", () => {
+  setAuthMode(false);
+  setMessage("Enter your email and password to log in.");
+});
+authForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (currentUser) return;
+
+  if (isRegisterMode) {
+    await register();
+    return;
+  }
+
+  await login();
+});
 upgradeBtn.addEventListener("click", async () => {
   try {
     const res = await api("/api/billing/upgrade-pro", { method: "POST" });
