@@ -8,6 +8,31 @@ npm start
 
 Then open `http://localhost:3000`.
 
+Run tests:
+
+```bash
+npm test
+```
+
+## Project structure
+
+```
+server.js              HTTP server, route handlers, auth helpers (~560 lines)
+lib/
+  db.js                Database abstraction (Postgres + JSON file fallback)
+  drills.js            DRILL_LIBRARY, rules engine, profile helpers
+  rate-limit.js        In-memory IP-based sliding-window rate limiter
+api/
+  index.js             Vercel serverless wrapper
+data/
+  db.json              Local dev database (JSON file)
+tests/
+  api.test.js          API test suite (node:test, 36 tests)
+index.html             SPA frontend
+app.js                 Frontend logic
+styles.css             Styling
+```
+
 ## Deploy to Vercel
 
 This project is ready for Vercel with:
@@ -21,21 +46,72 @@ Deploy:
 vercel --prod
 ```
 
-## Important data note
+## Environment variables
 
-Set `DATABASE_URL` in your Vercel project (for example from Vercel Postgres, Neon, Supabase, etc.). When present, the app stores users/sessions/routines in Postgres table `app_state`.
+| Variable | Required | Description |
+|---|---|---|
+| `DATABASE_URL` | No | Postgres connection string. When set, uses normalized tables (`users`, `sessions`, `routines`) with `pg.Pool`. Without it, falls back to JSON file at `data/db.json`. |
+| `ALLOWED_ORIGINS` | No | Comma-separated origins for CORS (e.g. `https://example.com,https://staging.example.com`). When unset, no CORS headers are sent (same-origin only). |
+| `SUPER_USER_NAME` | No | Display name for the bootstrap super user. |
+| `SUPER_USER_EMAIL` | No | Email for the bootstrap super user. Both email and password must be set. |
+| `SUPER_USER_PASSWORD` | No | Password for the bootstrap super user (min 8 chars). |
+| `PORT` | No | Server port (default: `3000`). |
+| `DB_DIR` | No | Override directory for JSON file storage. |
+| `PGSSLMODE` | No | Set to `disable` to turn off SSL for Postgres connections. |
 
-If `DATABASE_URL` is not set, filesystem writes fall back to `/tmp/golf-game-improvement` on Vercel, which is ephemeral and can lose data between cold starts/redeploys.
+## Database
+
+### Postgres mode (`DATABASE_URL` set)
+
+On startup, `db.init()` creates three normalized tables:
+
+- **users** — id, name, email, plan, role, salt, password_hash, profile (JSONB)
+- **sessions** — token, user_id, created_at
+- **routines** — id, user_id, title, meta, profile_snapshot (JSONB), weeks (JSONB), created_at
+
+If an `app_state` table exists (legacy single-JSONB-row format), data is automatically migrated into the new tables and `app_state` is dropped.
+
+Uses `pg.Pool` (max 10 connections) instead of a single client.
+
+### JSON file mode (no `DATABASE_URL`)
+
+Falls back to `data/db.json`. On Vercel without Postgres, writes go to `/tmp/golf-game-improvement` which is ephemeral — data can be lost between cold starts/redeploys.
+
+## Security
+
+- **Rate limiting** — Auth endpoints (`/api/auth/login`, `/api/auth/register`) are limited to 10 requests per 60 seconds per IP.
+- **Session expiry** — Tokens expire after 30 days. Expired sessions are cleaned up every 6 hours.
+- **Security headers** — All responses include `Content-Security-Policy`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Strict-Transport-Security`, `Referrer-Policy`, and `Permissions-Policy`.
+- **Input validation** — Field length limits on all user inputs, email format validation, password length bounds (8-128 chars).
+- **Graceful shutdown** — SIGTERM/SIGINT close the HTTP server, drain the connection pool, then exit.
+
+## API endpoints
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/api/health` | No | Health check |
+| POST | `/api/auth/register` | No | Create account |
+| POST | `/api/auth/login` | No | Log in |
+| GET | `/api/auth/me` | Yes | Current user |
+| POST | `/api/auth/logout` | Yes | Log out |
+| PUT | `/api/auth/password` | Yes | Change password |
+| GET | `/api/profile` | Yes | Get profile |
+| PUT | `/api/profile` | Yes | Update profile |
+| POST | `/api/routines/generate` | Yes | Generate routine (rules engine) |
+| GET | `/api/routines` | Yes | List saved routines |
+| POST | `/api/routines` | Yes | Save routine |
+| PUT | `/api/routines/:id` | Yes | Update routine |
+| DELETE | `/api/routines/:id` | Yes | Delete routine |
+| POST | `/api/billing/upgrade-pro` | Yes | Upgrade to Pro |
+| GET | `/api/admin/me` | Yes | Admin status check |
+| GET | `/api/admin/users` | Super | List all users |
+| POST | `/api/admin/users/promote` | Super | Promote user to super |
+| PUT | `/api/admin/users/:id` | Super | Update user plan/role |
 
 ## Routine generation
 
-Routines are generated entirely by the built-in rules engine (no AI provider or API key required).
+Routines are generated entirely by the built-in rules engine (no AI provider or API key required). The drill library contains 30 drills across 5 weakness categories, scored by relevance, skill level, type preference, and recency.
 
 ## Super user bootstrap
 
-To ensure a super user exists in the active database, set:
-- `SUPER_USER_NAME` (optional display name)
-- `SUPER_USER_EMAIL`
-- `SUPER_USER_PASSWORD` (minimum 8 chars)
-
-When both are set, the API bootstraps that account as `role: "super"` and `plan: "pro"` on requests, creating it if missing and updating password/role/plan if needed.
+To ensure a super user exists on startup, set `SUPER_USER_EMAIL` and `SUPER_USER_PASSWORD`. The account is created (or updated) once during `db.init()` with `role: "super"` and `plan: "pro"`.

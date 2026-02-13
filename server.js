@@ -111,6 +111,11 @@ function validateString(value, maxLen) {
 }
 
 async function handleApi(req, res, url) {
+  if (url.pathname === "/api/health" && req.method === "GET") {
+    sendJson(res, 200, { status: "ok", timestamp: new Date().toISOString() });
+    return;
+  }
+
   if (url.pathname === "/api/auth/register" && req.method === "POST") {
     const ip = clientIp(req);
     const limit = authLimiter.check(ip);
@@ -227,6 +232,44 @@ async function handleApi(req, res, url) {
     return;
   }
 
+  if (url.pathname === "/api/auth/password" && req.method === "PUT") {
+    const auth = await parseAuthUser(req);
+    if (!auth) {
+      sendJson(res, 401, { error: "Unauthorized" });
+      return;
+    }
+
+    try {
+      const body = await readBody(req);
+      const currentPassword = String(body.currentPassword || "");
+      const newPassword = String(body.newPassword || "");
+
+      if (!currentPassword || !newPassword) {
+        sendJson(res, 400, { error: "Current password and new password are required." });
+        return;
+      }
+
+      if (newPassword.length < 8 || newPassword.length > 128) {
+        sendJson(res, 400, { error: "New password must be between 8 and 128 characters." });
+        return;
+      }
+
+      const incomingHash = hashPassword(currentPassword, auth.user.salt);
+      if (incomingHash !== auth.user.passwordHash) {
+        sendJson(res, 403, { error: "Current password is incorrect." });
+        return;
+      }
+
+      const newHash = hashPassword(newPassword, auth.user.salt);
+      await db.updateUser(auth.user.id, { passwordHash: newHash });
+      sendJson(res, 200, { ok: true });
+      return;
+    } catch (err) {
+      sendJson(res, 400, { error: err.message });
+      return;
+    }
+  }
+
   if (url.pathname === "/api/profile" && req.method === "GET") {
     const auth = await parseAuthUser(req);
     if (!auth) {
@@ -333,6 +376,39 @@ async function handleApi(req, res, url) {
   }
 
   const routineMatch = url.pathname.match(/^\/api\/routines\/([a-zA-Z0-9-]+)$/);
+  if (routineMatch && req.method === "PUT") {
+    const auth = await parseAuthUser(req);
+    if (!auth) {
+      sendJson(res, 401, { error: "Unauthorized" });
+      return;
+    }
+
+    try {
+      const body = await readBody(req);
+      const updates = {};
+      if (body.title !== undefined) updates.title = validateString(body.title, 200);
+      if (body.meta !== undefined) updates.meta = validateString(body.meta, 500);
+      if (body.weeks !== undefined) updates.weeks = body.weeks;
+
+      if (Object.keys(updates).length === 0) {
+        sendJson(res, 400, { error: "No fields to update." });
+        return;
+      }
+
+      const updated = await db.updateRoutine(auth.user.id, routineMatch[1], updates);
+      if (!updated) {
+        sendJson(res, 404, { error: "Routine not found." });
+        return;
+      }
+
+      sendJson(res, 200, { routine: updated });
+      return;
+    } catch (err) {
+      sendJson(res, 400, { error: err.message });
+      return;
+    }
+  }
+
   if (routineMatch && req.method === "DELETE") {
     const auth = await parseAuthUser(req);
     if (!auth) {

@@ -457,6 +457,96 @@ describe("API", () => {
     });
   });
 
+  describe("Health", () => {
+    it("GET /api/health - returns ok", async () => {
+      const res = await fetch("GET", "/api/health");
+      assert.equal(res.status, 200);
+      assert.equal(res.body.status, "ok");
+      assert.ok(res.body.timestamp);
+    });
+  });
+
+  describe("Password change", () => {
+    let pwToken, pwUserId;
+
+    before(async () => {
+      const user = await directCreateUser("PwUser", "pwuser@example.com", "oldpass12345");
+      pwUserId = user.id;
+      pwToken = await directLogin(pwUserId);
+    });
+
+    it("PUT /api/auth/password - changes password", async () => {
+      const res = await authFetch("PUT", "/api/auth/password", pwToken, {
+        currentPassword: "oldpass12345",
+        newPassword: "newpass12345"
+      });
+      assert.equal(res.status, 200);
+      assert.equal(res.body.ok, true);
+    });
+
+    it("PUT /api/auth/password - rejects wrong current password", async () => {
+      const res = await authFetch("PUT", "/api/auth/password", pwToken, {
+        currentPassword: "wrongpassword",
+        newPassword: "newpass99999"
+      });
+      assert.equal(res.status, 403);
+    });
+
+    it("PUT /api/auth/password - rejects short new password", async () => {
+      const res = await authFetch("PUT", "/api/auth/password", pwToken, {
+        currentPassword: "newpass12345",
+        newPassword: "short"
+      });
+      assert.equal(res.status, 400);
+    });
+  });
+
+  describe("Routine update", () => {
+    let routineId;
+
+    before(async () => {
+      const genRes = await authFetch("POST", "/api/routines/generate", aliceToken, {
+        profile: {
+          name: "Alice",
+          handicap: "Beginner (36+)",
+          weakness: "Putting confidence",
+          daysPerWeek: 3,
+          hoursPerSession: 1.5
+        }
+      });
+      const saveRes = await authFetch("POST", "/api/routines", aliceToken, {
+        routine: genRes.body.routine
+      });
+      routineId = saveRes.body.routine.id;
+    });
+
+    it("PUT /api/routines/:id - updates title and meta", async () => {
+      const res = await authFetch("PUT", `/api/routines/${routineId}`, aliceToken, {
+        title: "Updated Title",
+        meta: "Updated Meta"
+      });
+      assert.equal(res.status, 200);
+      assert.equal(res.body.routine.title, "Updated Title");
+      assert.equal(res.body.routine.meta, "Updated Meta");
+    });
+
+    it("PUT /api/routines/:id - returns 404 for unknown routine", async () => {
+      const res = await authFetch("PUT", "/api/routines/nonexistent-id", aliceToken, {
+        title: "Nope"
+      });
+      assert.equal(res.status, 404);
+    });
+
+    it("PUT /api/routines/:id - rejects empty update", async () => {
+      const res = await authFetch("PUT", `/api/routines/${routineId}`, aliceToken, {});
+      assert.equal(res.status, 400);
+    });
+
+    after(async () => {
+      await db.deleteRoutine((await db.findUserByEmail("alice@example.com")).id, routineId);
+    });
+  });
+
   describe("404", () => {
     it("returns 404 for unknown API routes", async () => {
       const res = await fetch("GET", "/api/nonexistent");
