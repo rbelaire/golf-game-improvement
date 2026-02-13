@@ -51,6 +51,18 @@ body {
   gap: 0.75rem;
 }
 
+.routine-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.routine-nav .btn.active {
+  border-color: var(--green);
+  color: var(--green);
+  background: rgba(76, 175, 80, 0.12);
+}
+
 .welcome-panel {
   display: flex;
   align-items: center;
@@ -183,6 +195,20 @@ h2 {
   border-radius: 10px;
   padding: 0.85rem;
   background: rgba(255, 255, 255, 0.012);
+}
+
+.generated-subsection {
+  border-left: 4px solid #4caf50;
+}
+
+.custom-subsection {
+  border-left: 4px solid #d61d1d;
+}
+
+.plan-mode-note {
+  margin: 0;
+  color: #d6ead8;
+  font-size: 0.9rem;
 }
 
 .panel-subsection h3 {
@@ -401,7 +427,8 @@ button:disabled {
 
   .topbar-right {
     width: 100%;
-    justify-content: space-between;
+    justify-content: flex-start;
+    flex-wrap: wrap;
   }
 
   .welcome-panel {

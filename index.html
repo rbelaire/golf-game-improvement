@@ -22,6 +22,10 @@
       </div>
       <div class="topbar-right">
         <button id="loadDemoBtn" class="btn btn-outline" type="button">Load Demo Data</button>
+        <div class="routine-nav">
+          <button id="showGeneratedRoutineBtn" class="btn btn-outline active" type="button">Generated Routine</button>
+          <button id="showCustomRoutineBtn" class="btn btn-outline" type="button">Custom Routine</button>
+        </div>
         <div id="welcomePanel" class="welcome-panel hidden">
           <p id="welcomeName" class="welcome-name"></p>
           <p id="welcomeMessage" class="welcome-message"></p>
@@ -136,9 +140,31 @@
       </section>
 
       <section class="panel plan-panel">
-        <h2>Generated Practice Routine</h2>
-        <div class="panel-subsection">
-          <h3>Create Custom Routine</h3>
+        <h2 id="planPanelTitle">Generated Practice Routine</h2>
+        <div id="generatedRoutineView">
+          <div class="panel-subsection generated-subsection">
+            <h3>Rules Engine Plan</h3>
+            <p class="plan-mode-note">Use your profile form to generate a personalized routine.</p>
+          </div>
+          <div id="routineEmptyState" class="empty-state">
+            Sign in, then fill out your profile to generate a training routine.
+          </div>
+          <article id="routineCard" class="routine-card hidden">
+            <div class="routine-header">
+              <div>
+                <p id="routineTitle" class="routine-title"></p>
+                <p id="routineMeta" class="routine-meta"></p>
+              </div>
+              <button id="saveRoutineBtn" class="btn btn-primary" type="button">Save to Profile</button>
+            </div>
+            <div id="routineWeeks" class="routine-weeks"></div>
+          </article>
+        </div>
+        <div id="customRoutineView" class="hidden">
+          <div class="panel-subsection custom-subsection">
+            <h3>Custom Routine Builder</h3>
+            <p class="plan-mode-note">Create your own drill sequence and structure it exactly how you want.</p>
+          </div>
           <form id="customRoutineForm" class="form-stack">
             <label>
               Custom Routine Title
@@ -161,19 +187,6 @@
             <button class="btn btn-outline" type="submit">Create Custom Routine</button>
           </form>
         </div>
-        <div id="routineEmptyState" class="empty-state">
-          Sign in, then fill out your profile to generate a training routine.
-        </div>
-        <article id="routineCard" class="routine-card hidden">
-          <div class="routine-header">
-            <div>
-              <p id="routineTitle" class="routine-title"></p>
-              <p id="routineMeta" class="routine-meta"></p>
-            </div>
-            <button id="saveRoutineBtn" class="btn btn-primary" type="button">Save to Profile</button>
-          </div>
-          <div id="routineWeeks" class="routine-weeks"></div>
-        </article>
       </section>
 
       <section class="panel saved-panel">

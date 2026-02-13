@@ -21,6 +21,11 @@ const profileForm = document.getElementById("profileForm");
 const generateRoutineBtn = document.getElementById("generateRoutineBtn");
 const clearProfileBtn = document.getElementById("clearProfileBtn");
 const loadDemoBtn = document.getElementById("loadDemoBtn");
+const showGeneratedRoutineBtn = document.getElementById("showGeneratedRoutineBtn");
+const showCustomRoutineBtn = document.getElementById("showCustomRoutineBtn");
+const generatedRoutineView = document.getElementById("generatedRoutineView");
+const customRoutineView = document.getElementById("customRoutineView");
+const planPanelTitle = document.getElementById("planPanelTitle");
 const welcomePanel = document.getElementById("welcomePanel");
 const welcomeName = document.getElementById("welcomeName");
 const welcomeMessage = document.getElementById("welcomeMessage");
@@ -46,6 +51,7 @@ let currentUser = null;
 let savedRoutines = [];
 let isRegisterMode = false;
 let isGeneratingRoutine = false;
+let activePlanMode = "generated";
 const FREE_ROUTINE_LIMIT = 5;
 
 function getToken() {
@@ -119,6 +125,19 @@ function setMessage(message, isError = false) {
   topMessage.classList.toggle("hidden", !currentUser || !message);
 }
 
+function setPlanMode(mode) {
+  activePlanMode = mode === "custom" ? "custom" : "generated";
+
+  const showGenerated = activePlanMode === "generated";
+  generatedRoutineView.classList.toggle("hidden", !showGenerated);
+  customRoutineView.classList.toggle("hidden", showGenerated);
+
+  showGeneratedRoutineBtn.classList.toggle("active", showGenerated);
+  showCustomRoutineBtn.classList.toggle("active", !showGenerated);
+
+  planPanelTitle.textContent = showGenerated ? "Generated Practice Routine" : "Custom Practice Routine";
+}
+
 function getProfileFromForm() {
   return {
     name: document.getElementById("name").value.trim(),
@@ -149,6 +168,8 @@ function lockPlanner(locked) {
 
   saveRoutineBtn.disabled = locked;
   loadDemoBtn.disabled = locked;
+  showGeneratedRoutineBtn.disabled = locked;
+  showCustomRoutineBtn.disabled = locked;
   upgradeBtn.disabled = locked;
 
   if (locked) {
@@ -165,6 +186,7 @@ function lockPlanner(locked) {
   if (locked) {
     isGeneratingRoutine = false;
     generateRoutineBtn.textContent = "Generate Routine";
+    setPlanMode("generated");
   }
 }
 
@@ -495,6 +517,12 @@ showLoginBtn.addEventListener("click", () => {
   setAuthMode(false);
   setMessage("Enter your email and password to log in.");
 });
+showGeneratedRoutineBtn.addEventListener("click", () => {
+  setPlanMode("generated");
+});
+showCustomRoutineBtn.addEventListener("click", () => {
+  setPlanMode("custom");
+});
 authForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (currentUser) return;
@@ -627,6 +655,7 @@ customRoutineForm.addEventListener("submit", (event) => {
 });
 
 (async function init() {
+  setPlanMode("generated");
   updateAuthUi();
 
   const token = getToken();
