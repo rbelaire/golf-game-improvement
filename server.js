@@ -145,6 +145,24 @@ function parseAuthUser(req, db) {
   return { user, token };
 }
 
+function userRole(user) {
+  return user?.role === "super" ? "super" : "user";
+}
+
+function isSuperUser(user) {
+  return userRole(user) === "super";
+}
+
+function publicUser(user) {
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    plan: user.plan || "free",
+    role: userRole(user)
+  };
+}
+
 function isSafeStaticPath(filePath) {
   const resolved = path.resolve(filePath);
   return resolved.startsWith(path.resolve(__dirname));
@@ -390,6 +408,7 @@ async function handleApi(req, res, url) {
         name,
         email,
         plan: "free",
+        role: "user",
         salt,
         passwordHash,
         profile: null,
@@ -401,7 +420,7 @@ async function handleApi(req, res, url) {
 
       sendJson(res, 201, {
         token,
-        user: { id: user.id, name: user.name, email: user.email, plan: user.plan }
+        user: publicUser(user)
       });
       return;
     } catch (err) {
@@ -432,7 +451,7 @@ async function handleApi(req, res, url) {
       await writeDb(db);
       sendJson(res, 200, {
         token,
-        user: { id: user.id, name: user.name, email: user.email, plan: user.plan || "free" }
+        user: publicUser(user)
       });
       return;
     } catch (err) {
@@ -449,12 +468,7 @@ async function handleApi(req, res, url) {
     }
 
     sendJson(res, 200, {
-      user: {
-        id: auth.user.id,
-        name: auth.user.name,
-        email: auth.user.email,
-        plan: auth.user.plan || "free"
-      }
+      user: publicUser(auth.user)
     });
     return;
   }
@@ -570,7 +584,7 @@ async function handleApi(req, res, url) {
 
       const user = db.users.find((item) => item.id === auth.user.id);
       const currentPlan = user.plan || "free";
-      const isFreePlan = currentPlan !== "pro";
+      const isFreePlan = currentPlan !== "pro" && !isSuperUser(user);
       const currentCount = (user.routines || []).length;
       if (isFreePlan && currentCount >= 5) {
         sendJson(res, 402, {
@@ -623,7 +637,129 @@ async function handleApi(req, res, url) {
     user.plan = "pro";
     await writeDb(db);
     sendJson(res, 200, {
-      user: { id: user.id, name: user.name, email: user.email, plan: user.plan }
+      user: publicUser(user)
+    });
+    return;
+  }
+
+  if (url.pathname === "/api/admin/users" && req.method === "GET") {
+    const auth = parseAuthUser(req, db);
+    if (!auth) {
+      sendJson(res, 401, { error: "Unauthorized" });
+      return;
+    }
+    if (!isSuperUser(auth.user)) {
+      sendJson(res, 403, { error: "Forbidden" });
+      return;
+    }
+
+    sendJson(res, 200, {
+      users: db.users.map((user) => ({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        plan: user.plan || "free",
+        role: userRole(user),
+        routineCount: (user.routines || []).length
+      }))
+    });
+    return;
+  }
+
+  if (url.pathname === "/api/admin/users/promote" && req.method === "POST") {
+    const auth = parseAuthUser(req, db);
+    if (!auth) {
+      sendJson(res, 401, { error: "Unauthorized" });
+      return;
+    }
+    if (!isSuperUser(auth.user)) {
+      sendJson(res, 403, { error: "Forbidden" });
+      return;
+    }
+
+    try {
+      const body = await readBody(req);
+      const email = String(body.email || "").trim().toLowerCase();
+      if (!email) {
+        sendJson(res, 400, { error: "Email is required." });
+        return;
+      }
+
+      const targetUser = db.users.find((item) => item.email === email);
+      if (!targetUser) {
+        sendJson(res, 404, { error: "User not found." });
+        return;
+      }
+
+      targetUser.role = "super";
+      targetUser.plan = "pro";
+      await writeDb(db);
+      sendJson(res, 200, { user: publicUser(targetUser) });
+      return;
+    } catch (err) {
+      sendJson(res, 400, { error: err.message });
+      return;
+    }
+  }
+
+  const adminUserMatch = url.pathname.match(/^\/api\/admin\/users\/([a-zA-Z0-9-]+)$/);
+  if (adminUserMatch && req.method === "PUT") {
+    const auth = parseAuthUser(req, db);
+    if (!auth) {
+      sendJson(res, 401, { error: "Unauthorized" });
+      return;
+    }
+    if (!isSuperUser(auth.user)) {
+      sendJson(res, 403, { error: "Forbidden" });
+      return;
+    }
+
+    try {
+      const body = await readBody(req);
+      const targetUser = db.users.find((item) => item.id === adminUserMatch[1]);
+      if (!targetUser) {
+        sendJson(res, 404, { error: "User not found." });
+        return;
+      }
+
+      if (body.plan !== undefined) {
+        const nextPlan = String(body.plan).trim().toLowerCase();
+        if (!["free", "pro"].includes(nextPlan)) {
+          sendJson(res, 400, { error: "plan must be 'free' or 'pro'." });
+          return;
+        }
+        targetUser.plan = nextPlan;
+      }
+
+      if (body.role !== undefined) {
+        const nextRole = String(body.role).trim().toLowerCase();
+        if (!["user", "super"].includes(nextRole)) {
+          sendJson(res, 400, { error: "role must be 'user' or 'super'." });
+          return;
+        }
+        targetUser.role = nextRole;
+      }
+
+      await writeDb(db);
+      sendJson(res, 200, { user: publicUser(targetUser) });
+      return;
+    } catch (err) {
+      sendJson(res, 400, { error: err.message });
+      return;
+    }
+  }
+
+  if (url.pathname === "/api/admin/me" && req.method === "GET") {
+    const auth = parseAuthUser(req, db);
+    if (!auth) {
+      sendJson(res, 401, { error: "Unauthorized" });
+      return;
+    }
+
+    sendJson(res, 200, {
+      isSuper: isSuperUser(auth.user),
+      role: userRole(auth.user),
+      user: publicUser(auth.user)
     });
     return;
   }

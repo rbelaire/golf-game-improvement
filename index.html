@@ -19,11 +19,18 @@
         <p class="brand-tag">Golf training intelligence</p>
         <h1>thegolfbuild</h1>
       </div>
-      <button id="loadDemoBtn" class="btn btn-outline" type="button">Load Demo Data</button>
+      <div class="topbar-right">
+        <button id="loadDemoBtn" class="btn btn-outline" type="button">Load Demo Data</button>
+        <div id="welcomePanel" class="welcome-panel hidden">
+          <p id="welcomeName" class="welcome-name"></p>
+          <p id="welcomeMessage" class="welcome-message"></p>
+          <button id="topLogoutBtn" class="btn btn-danger" type="button">Logout</button>
+        </div>
+      </div>
     </header>
 
     <main class="layout">
-      <section class="panel auth-panel">
+      <section id="authPanel" class="panel auth-panel">
         <div class="auth-head">
           <h2>Account</h2>
           <p id="authStatus" class="auth-status">Not signed in</p>
@@ -46,8 +53,28 @@
             <button id="registerBtn" class="btn btn-primary hidden" type="button">Create Account</button>
             <button id="loginBtn" class="btn btn-primary" type="button">Login</button>
             <button id="showRegisterBtn" class="btn btn-outline" type="button">Register</button>
+            <button id="forgotPasswordBtn" class="btn btn-outline" type="button">Forgot Password</button>
             <button id="showLoginBtn" class="btn btn-outline hidden" type="button">Back to Login</button>
             <button id="logoutBtn" class="btn btn-danger hidden" type="button">Logout</button>
+          </div>
+          <div id="resetPasswordPanel" class="reset-panel hidden">
+            <label>
+              Reset Email
+              <input type="email" id="resetEmail" placeholder="you@example.com" />
+            </label>
+            <label>
+              Reset Code
+              <input type="text" id="resetCode" placeholder="6-digit code" />
+            </label>
+            <label>
+              New Password
+              <input type="password" id="resetNewPassword" placeholder="At least 8 characters" />
+            </label>
+            <div class="cta-row">
+              <button id="sendResetCodeBtn" class="btn btn-outline" type="button">Send Code</button>
+              <button id="resetPasswordBtn" class="btn btn-primary" type="button">Reset Password</button>
+              <button id="cancelResetBtn" class="btn btn-outline" type="button">Cancel</button>
+            </div>
           </div>
         </form>
         <p id="appMessage" class="app-message" aria-live="polite"></p>

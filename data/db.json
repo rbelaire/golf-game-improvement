@@ -1,4 +1,16 @@
 {
-  "users": [],
+  "users": [
+    {
+      "id": "59527f63-5012-4bda-8bea-e85ffbc02998",
+      "name": "RJ Belaire",
+      "email": "rjbelaire@gmail.com",
+      "plan": "pro",
+      "role": "super",
+      "salt": "5dbd50aab344f717b2f4176f0cacbc28",
+      "passwordHash": "9f3a1f3d83e3d8390f8edc23ece633eaac41235a5b3f0834c73a13a036478d8fca301f1bbf5ceeaaef1b3f9a991f32209344b2f49397b4df2b8cbeab53766355",
+      "profile": null,
+      "routines": []
+    }
+  ],
   "sessions": []
 }

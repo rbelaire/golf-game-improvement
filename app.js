@@ -5,6 +5,7 @@ const STORAGE_KEYS = {
 
 const authStatus = document.getElementById("authStatus");
 const appMessage = document.getElementById("appMessage");
+const authPanel = document.getElementById("authPanel");
 const authForm = document.getElementById("authForm");
 const accountNameInput = document.getElementById("accountName");
 const accountEmailInput = document.getElementById("accountEmail");
@@ -19,6 +20,10 @@ const registerNameField = document.getElementById("registerNameField");
 const profileForm = document.getElementById("profileForm");
 const clearProfileBtn = document.getElementById("clearProfileBtn");
 const loadDemoBtn = document.getElementById("loadDemoBtn");
+const welcomePanel = document.getElementById("welcomePanel");
+const welcomeName = document.getElementById("welcomeName");
+const welcomeMessage = document.getElementById("welcomeMessage");
+const topLogoutBtn = document.getElementById("topLogoutBtn");
 const saveRoutineBtn = document.getElementById("saveRoutineBtn");
 const customRoutineForm = document.getElementById("customRoutineForm");
 const upgradeBtn = document.getElementById("upgradeBtn");
@@ -324,6 +329,16 @@ function updateAuthUi() {
   const isAuthed = Boolean(currentUser);
   authStatus.textContent = isAuthed ? `Signed in as ${currentUser.name}` : "Not signed in";
   setAuthMode(isAuthed ? false : isRegisterMode);
+  authPanel.classList.toggle("hidden", isAuthed);
+  welcomePanel.classList.toggle("hidden", !isAuthed);
+  loadDemoBtn.classList.toggle("hidden", isAuthed);
+  if (isAuthed) {
+    welcomeName.textContent = currentUser.name;
+    welcomeMessage.textContent = `Let's get better today ${currentUser.name}`;
+  } else {
+    welcomeName.textContent = "";
+    welcomeMessage.textContent = "";
+  }
   lockPlanner(!isAuthed);
   renderUsage();
 }
@@ -439,6 +454,7 @@ function buildCustomRoutine() {
 registerBtn.addEventListener("click", register);
 loginBtn.addEventListener("click", login);
 logoutBtn.addEventListener("click", logout);
+topLogoutBtn.addEventListener("click", logout);
 showRegisterBtn.addEventListener("click", () => {
   setAuthMode(true);
   setMessage("Enter your name, email, and password to create an account.");

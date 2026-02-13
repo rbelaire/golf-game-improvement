@@ -45,6 +45,34 @@ body {
   gap: 1rem;
 }
 
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.welcome-panel {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 0.5rem 0.65rem;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.welcome-name {
+  margin: 0;
+  font: 700 1rem "Rajdhani", sans-serif;
+  letter-spacing: 0.02em;
+}
+
+.welcome-message {
+  margin: 0;
+  color: #d6ead8;
+  font-size: 0.85rem;
+}
+
 .brand-tag {
   margin: 0;
   letter-spacing: 0.1em;
@@ -358,6 +386,16 @@ button:disabled {
   .topbar {
     align-items: start;
     flex-direction: column;
+  }
+
+  .topbar-right {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .welcome-panel {
+    flex-wrap: wrap;
+    justify-content: flex-end;
   }
 }
 
