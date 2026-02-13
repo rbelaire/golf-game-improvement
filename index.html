@@ -19,6 +19,39 @@
   </head>
   <body>
     <div class="bg-grid"></div>
+    <div id="toastContainer" class="toast-container" aria-live="polite"></div>
+
+    <div id="onboardingOverlay" class="onboarding-overlay hidden">
+      <div class="onboarding-card">
+        <div class="onboarding-steps">
+          <div class="onboarding-step active" data-step="0">
+            <div class="onboarding-icon">&#9971;</div>
+            <h2>Welcome to thegolfbuild</h2>
+            <p>Build personalized practice routines backed by a smart rules engine. Track your sessions, browse drills, and take your game to the range.</p>
+          </div>
+          <div class="onboarding-step" data-step="1">
+            <div class="onboarding-icon">&#9881;</div>
+            <h2>Set up your profile</h2>
+            <p>Tell us your handicap, primary weakness, and schedule. The engine picks drills matched to your level and goals across a 4-week plan.</p>
+          </div>
+          <div class="onboarding-step" data-step="2">
+            <div class="onboarding-icon">&#10004;</div>
+            <h2>Track, export, improve</h2>
+            <p>Check off sessions as you complete them. Export routines to PDF or calendar. Watch your stats grow on the performance dashboard.</p>
+          </div>
+        </div>
+        <div class="onboarding-dots">
+          <span class="onboarding-dot active" data-dot="0"></span>
+          <span class="onboarding-dot" data-dot="1"></span>
+          <span class="onboarding-dot" data-dot="2"></span>
+        </div>
+        <div class="onboarding-actions">
+          <button id="onboardingSkip" class="btn btn-outline" type="button">Skip</button>
+          <button id="onboardingNext" class="btn btn-primary" type="button">Next</button>
+        </div>
+      </div>
+    </div>
+
     <header class="topbar">
       <div class="brand-wrap">
         <p class="brand-tag">Golf training intelligence</p>
@@ -26,12 +59,6 @@
       </div>
       <div class="topbar-right">
         <button id="loadDemoBtn" class="btn btn-outline" type="button">Load Demo Data</button>
-        <div class="routine-nav">
-          <button id="showGeneratedRoutineBtn" class="btn btn-outline active" type="button">Generated Routine</button>
-          <button id="showCustomRoutineBtn" class="btn btn-outline" type="button">Custom Routine</button>
-          <button id="showDrillLibraryBtn" class="btn btn-outline" type="button">Drills</button>
-          <button id="showStatsBtn" class="btn btn-outline" type="button">Stats</button>
-        </div>
         <div id="welcomePanel" class="welcome-panel hidden">
           <p id="welcomeName" class="welcome-name"></p>
           <p id="welcomeMessage" class="welcome-message"></p>
@@ -52,9 +79,23 @@
             </div>
           </div>
         </div>
-        <p id="topMessage" class="top-message hidden" aria-live="polite"></p>
       </div>
     </header>
+
+    <nav class="tab-bar">
+      <button id="showGeneratedRoutineBtn" class="tab-btn active" type="button">
+        <span class="tab-icon">&#9776;</span><span class="tab-label">Routine</span>
+      </button>
+      <button id="showCustomRoutineBtn" class="tab-btn" type="button">
+        <span class="tab-icon">&#9998;</span><span class="tab-label">Custom</span>
+      </button>
+      <button id="showDrillLibraryBtn" class="tab-btn" type="button">
+        <span class="tab-icon">&#9863;</span><span class="tab-label">Drills</span>
+      </button>
+      <button id="showStatsBtn" class="tab-btn" type="button">
+        <span class="tab-icon">&#9670;</span><span class="tab-label">Stats</span>
+      </button>
+    </nav>
 
     <main class="layout">
       <section id="authPanel" class="panel auth-panel">

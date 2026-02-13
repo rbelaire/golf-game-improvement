@@ -54,6 +54,8 @@ const drillLibraryContent = document.getElementById("drillLibraryContent");
 const statsPanel = document.getElementById("statsPanel");
 const exportPdfBtn = document.getElementById("exportPdfBtn");
 const exportIcalBtn = document.getElementById("exportIcalBtn");
+const toastContainer = document.getElementById("toastContainer");
+const onboardingOverlay = document.getElementById("onboardingOverlay");
 
 let currentRoutine = null;
 let currentUser = null;
@@ -151,12 +153,32 @@ function handleUnauthorizedSession() {
   setMessage("Session expired. Please log in again.", true);
 }
 
+function showToast(message, isError = false) {
+  if (!message) return;
+  const toast = document.createElement("div");
+  toast.className = `toast ${isError ? "error" : "success"}`;
+  const text = document.createElement("span");
+  text.textContent = message;
+  const dismiss = document.createElement("button");
+  dismiss.className = "toast-dismiss";
+  dismiss.textContent = "\u00d7";
+  dismiss.addEventListener("click", () => removeToast(toast));
+  toast.appendChild(text);
+  toast.appendChild(dismiss);
+  toastContainer.appendChild(toast);
+  setTimeout(() => removeToast(toast), 4000);
+}
+
+function removeToast(toast) {
+  if (!toast.parentNode) return;
+  toast.classList.add("removing");
+  setTimeout(() => toast.remove(), 250);
+}
+
 function setMessage(message, isError = false) {
   appMessage.textContent = message;
   appMessage.classList.toggle("error", isError);
-  topMessage.textContent = message;
-  topMessage.classList.toggle("error", isError);
-  topMessage.classList.toggle("hidden", !currentUser || !message);
+  if (message) showToast(message, isError);
 }
 
 function getDisplayFirstName() {
@@ -362,6 +384,21 @@ function generateRoutine(profile) {
   };
 }
 
+function parseBulletType(bullet) {
+  const lower = bullet.toLowerCase();
+  if (lower.includes("warm-up") || lower.includes("warm up")) return "warmup";
+  if (lower.includes("technical")) return "technical";
+  if (lower.includes("pressure")) return "pressure";
+  if (lower.includes("transfer")) return "transfer";
+  if (lower.includes("reflection")) return "reflection";
+  return "technical";
+}
+
+function parseBulletDuration(bullet) {
+  const match = bullet.match(/^(\d+)\s*min/);
+  return match ? match[1] + " min" : "";
+}
+
 function renderRoutine(routine) {
   if (!routine) {
     routineCard.classList.add("hidden");
@@ -394,23 +431,58 @@ function renderRoutine(routine) {
       const done = Boolean(completions[key]);
       if (done) weekDone += 1;
 
-      const row = document.createElement("div");
-      row.className = "session-check" + (done ? " completed" : "");
+      const card = document.createElement("div");
+      card.className = "session-card" + (done ? " completed" : "");
+
+      // Header with checkbox and title
+      const header = document.createElement("div");
+      header.className = "session-card-header";
 
       if (isSaved) {
         const cb = document.createElement("input");
         cb.type = "checkbox";
         cb.checked = done;
         cb.id = `sc-${wi}-${si}`;
-        cb.addEventListener("change", () => toggleCompletion(routine.id, key));
-        row.appendChild(cb);
+        cb.addEventListener("change", () => toggleCompletion(routine.id, key, wi, weekTotal));
+        header.appendChild(cb);
       }
 
-      const lbl = document.createElement("label");
-      if (isSaved) lbl.setAttribute("for", `sc-${wi}-${si}`);
-      lbl.textContent = `${session.title}: ${session.bullets.join(" ")}`;
-      row.appendChild(lbl);
-      block.appendChild(row);
+      const titleWrap = document.createElement("div");
+      titleWrap.className = "session-card-title";
+      const titleLabel = document.createElement("label");
+      if (isSaved) titleLabel.setAttribute("for", `sc-${wi}-${si}`);
+      titleLabel.textContent = session.title;
+      titleWrap.appendChild(titleLabel);
+      header.appendChild(titleWrap);
+      card.appendChild(header);
+
+      // Body with structured drill blocks
+      const body = document.createElement("div");
+      body.className = "session-card-body";
+
+      session.bullets.forEach((bullet) => {
+        const drillBlock = document.createElement("div");
+        drillBlock.className = "drill-block";
+
+        const type = parseBulletType(bullet);
+        const duration = parseBulletDuration(bullet);
+
+        const chip = document.createElement("span");
+        chip.className = `drill-chip ${type}`;
+        chip.textContent = duration || type;
+        drillBlock.appendChild(chip);
+
+        const text = document.createElement("span");
+        text.className = "drill-text";
+        // Strip the duration prefix for cleaner display
+        text.textContent = bullet.replace(/^\d+\s*min\s*/, "");
+        drillBlock.appendChild(text);
+
+        body.appendChild(drillBlock);
+      });
+
+      card.appendChild(body);
+      block.appendChild(card);
     });
 
     if (isSaved && weekTotal > 0) {
@@ -431,7 +503,7 @@ function renderRoutine(routine) {
   saveRoutineNameInput.placeholder = `Save as (optional title) • ${routine.title}`;
 }
 
-async function toggleCompletion(routineId, key) {
+async function toggleCompletion(routineId, key, weekIndex, weekTotal) {
   try {
     const result = await api(`/api/routines/${routineId}/complete`, {
       method: "POST",
@@ -445,9 +517,42 @@ async function toggleCompletion(routineId, key) {
       renderRoutine(currentRoutine);
     }
     renderSavedRoutines();
+
+    // Check if entire week is now complete for confetti
+    if (weekIndex !== undefined && weekTotal) {
+      const completions = updated.completions || {};
+      let weekDone = 0;
+      for (let si = 0; si < weekTotal; si++) {
+        if (completions[`${weekIndex}-${si}`]) weekDone += 1;
+      }
+      if (weekDone === weekTotal) {
+        spawnConfetti();
+        showToast("Week complete! Great work.");
+      }
+    }
   } catch (err) {
     setMessage(err.message, true);
   }
+}
+
+function spawnConfetti() {
+  const container = document.createElement("div");
+  container.className = "confetti-container";
+  document.body.appendChild(container);
+
+  const colors = ["#4caf50", "#ffb74d", "#42a5f5", "#ef5350", "#ab47bc", "#fff"];
+  for (let i = 0; i < 40; i++) {
+    const piece = document.createElement("div");
+    piece.className = "confetti-piece";
+    piece.style.left = `${Math.random() * 100}%`;
+    piece.style.top = `${20 + Math.random() * 30}%`;
+    piece.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+    piece.style.animationDelay = `${Math.random() * 0.4}s`;
+    piece.style.animationDuration = `${0.8 + Math.random() * 0.8}s`;
+    container.appendChild(piece);
+  }
+
+  setTimeout(() => container.remove(), 2000);
 }
 
 function routineProgress(routine) {
@@ -524,11 +629,9 @@ function updateAuthUi() {
   if (isAuthed) {
     welcomeName.textContent = "";
     welcomeMessage.textContent = `Let's get better today ${getDisplayFirstName()}`;
-    topMessage.classList.toggle("hidden", !topMessage.textContent);
   } else {
     welcomeName.textContent = "";
     welcomeMessage.textContent = "";
-    topMessage.classList.add("hidden");
   }
   lockPlanner(!isAuthed);
   renderUsage();
@@ -1046,7 +1149,43 @@ customRoutineForm.addEventListener("submit", (event) => {
   }
 });
 
+// Onboarding
+function initOnboarding() {
+  const key = "thegolfbuild_onboarded";
+  if (localStorage.getItem(key)) return;
+
+  onboardingOverlay.classList.remove("hidden");
+  let step = 0;
+  const steps = onboardingOverlay.querySelectorAll(".onboarding-step");
+  const dots = onboardingOverlay.querySelectorAll(".onboarding-dot");
+  const nextBtn = document.getElementById("onboardingNext");
+  const skipBtn = document.getElementById("onboardingSkip");
+
+  function showStep(n) {
+    steps.forEach((s, i) => s.classList.toggle("active", i === n));
+    dots.forEach((d, i) => d.classList.toggle("active", i === n));
+    nextBtn.textContent = n === steps.length - 1 ? "Get Started" : "Next";
+  }
+
+  nextBtn.addEventListener("click", () => {
+    step += 1;
+    if (step >= steps.length) {
+      closeOnboarding();
+    } else {
+      showStep(step);
+    }
+  });
+
+  skipBtn.addEventListener("click", closeOnboarding);
+
+  function closeOnboarding() {
+    onboardingOverlay.classList.add("hidden");
+    localStorage.setItem(key, "1");
+  }
+}
+
 (async function init() {
+  initOnboarding();
   setPlanMode("generated");
   updateAuthUi();
 
