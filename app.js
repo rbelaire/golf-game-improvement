@@ -446,6 +446,8 @@ async function register() {
     return;
   }
 
+  registerBtn.disabled = true;
+  registerBtn.textContent = "Creating...";
   try {
     const result = await api("/api/auth/register", {
       method: "POST",
@@ -459,6 +461,9 @@ async function register() {
     setMessage("Account created. You can now generate and save routines.");
   } catch (err) {
     setMessage(err.message, true);
+  } finally {
+    registerBtn.disabled = false;
+    registerBtn.textContent = "Create Account";
   }
 }
 
@@ -471,6 +476,8 @@ async function login() {
     return;
   }
 
+  loginBtn.disabled = true;
+  loginBtn.textContent = "Logging in...";
   try {
     const result = await api("/api/auth/login", {
       method: "POST",
@@ -484,6 +491,9 @@ async function login() {
     setMessage("Logged in successfully.");
   } catch (err) {
     setMessage(err.message, true);
+  } finally {
+    loginBtn.disabled = false;
+    loginBtn.textContent = "Login";
   }
 }
 
@@ -556,6 +566,59 @@ showLoginBtn.addEventListener("click", () => {
   setAuthMode(false);
   setMessage("Enter your email and password to log in.");
 });
+
+const changePasswordBtn = document.getElementById("changePasswordBtn");
+const changePasswordPanel = document.getElementById("changePasswordPanel");
+const currentPasswordInput = document.getElementById("currentPasswordInput");
+const newPasswordInput = document.getElementById("newPasswordInput");
+const submitPasswordChangeBtn = document.getElementById("submitPasswordChangeBtn");
+const cancelPasswordChangeBtn = document.getElementById("cancelPasswordChangeBtn");
+
+changePasswordBtn.addEventListener("click", () => {
+  changePasswordPanel.classList.toggle("hidden");
+  currentPasswordInput.value = "";
+  newPasswordInput.value = "";
+});
+
+cancelPasswordChangeBtn.addEventListener("click", () => {
+  changePasswordPanel.classList.add("hidden");
+  currentPasswordInput.value = "";
+  newPasswordInput.value = "";
+});
+
+submitPasswordChangeBtn.addEventListener("click", async () => {
+  const currentPassword = currentPasswordInput.value;
+  const newPassword = newPasswordInput.value;
+
+  if (!currentPassword || !newPassword) {
+    setMessage("Both current and new password are required.", true);
+    return;
+  }
+
+  if (newPassword.length < 8) {
+    setMessage("New password must be at least 8 characters.", true);
+    return;
+  }
+
+  submitPasswordChangeBtn.disabled = true;
+  submitPasswordChangeBtn.textContent = "Updating...";
+  try {
+    await api("/api/auth/password", {
+      method: "PUT",
+      body: JSON.stringify({ currentPassword, newPassword })
+    });
+    changePasswordPanel.classList.add("hidden");
+    currentPasswordInput.value = "";
+    newPasswordInput.value = "";
+    setMessage("Password updated successfully.");
+  } catch (err) {
+    setMessage(err.message, true);
+  } finally {
+    submitPasswordChangeBtn.disabled = false;
+    submitPasswordChangeBtn.textContent = "Update Password";
+  }
+});
+
 showGeneratedRoutineBtn.addEventListener("click", () => {
   setPlanMode("generated");
 });

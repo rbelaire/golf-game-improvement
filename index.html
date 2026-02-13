@@ -30,6 +30,21 @@
           <p id="welcomeName" class="welcome-name"></p>
           <p id="welcomeMessage" class="welcome-message"></p>
           <button id="topLogoutBtn" class="btn btn-danger" type="button">Logout</button>
+          <button id="changePasswordBtn" class="btn btn-outline" type="button">Change Password</button>
+          <div id="changePasswordPanel" class="reset-panel hidden">
+            <label>
+              Current Password
+              <input type="password" id="currentPasswordInput" placeholder="Your current password" />
+            </label>
+            <label>
+              New Password
+              <input type="password" id="newPasswordInput" placeholder="At least 8 characters" />
+            </label>
+            <div class="cta-row">
+              <button id="submitPasswordChangeBtn" class="btn btn-primary" type="button">Update Password</button>
+              <button id="cancelPasswordChangeBtn" class="btn btn-outline" type="button">Cancel</button>
+            </div>
+          </div>
         </div>
         <p id="topMessage" class="top-message hidden" aria-live="polite"></p>
       </div>
@@ -59,28 +74,8 @@
             <button id="registerBtn" class="btn btn-primary hidden" type="button">Create Account</button>
             <button id="loginBtn" class="btn btn-primary" type="button">Login</button>
             <button id="showRegisterBtn" class="btn btn-outline" type="button">Register</button>
-            <button id="forgotPasswordBtn" class="btn btn-outline" type="button">Forgot Password</button>
             <button id="showLoginBtn" class="btn btn-outline hidden" type="button">Back to Login</button>
             <button id="logoutBtn" class="btn btn-danger hidden" type="button">Logout</button>
-          </div>
-          <div id="resetPasswordPanel" class="reset-panel hidden">
-            <label>
-              Reset Email
-              <input type="email" id="resetEmail" placeholder="you@example.com" />
-            </label>
-            <label>
-              Reset Code
-              <input type="text" id="resetCode" placeholder="6-digit code" />
-            </label>
-            <label>
-              New Password
-              <input type="password" id="resetNewPassword" placeholder="At least 8 characters" />
-            </label>
-            <div class="cta-row">
-              <button id="sendResetCodeBtn" class="btn btn-outline" type="button">Send Code</button>
-              <button id="resetPasswordBtn" class="btn btn-primary" type="button">Reset Password</button>
-              <button id="cancelResetBtn" class="btn btn-outline" type="button">Cancel</button>
-            </div>
           </div>
         </form>
         <p id="appMessage" class="app-message" aria-live="polite"></p>
