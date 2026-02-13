@@ -4,7 +4,8 @@
   "private": true,
   "description": "thegolfbuild practice planning web app",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node --test tests/"
   },
   "dependencies": {
     "pg": "^8.13.3"
