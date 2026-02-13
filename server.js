@@ -10,6 +10,7 @@ const { createRateLimiter } = require("./lib/rate-limit");
 const PORT = process.env.PORT || 3000;
 const SESSION_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 const authLimiter = createRateLimiter(10, 60000);
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "").split(",").map((s) => s.trim()).filter(Boolean);
 
 function sendJson(res, status, payload) {
   res.writeHead(status, { "Content-Type": "application/json" });
@@ -501,13 +502,36 @@ function setSecurityHeaders(res) {
   res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
 }
 
+function setCorsHeaders(req, res) {
+  if (ALLOWED_ORIGINS.length === 0) return false;
+  const origin = req.headers.origin;
+  if (!origin || !ALLOWED_ORIGINS.includes(origin)) return false;
+  res.setHeader("Access-Control-Allow-Origin", origin);
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader("Access-Control-Max-Age", "86400");
+  res.setHeader("Vary", "Origin");
+  return true;
+}
+
 async function requestHandler(req, res, options = {}) {
+  const start = Date.now();
   setSecurityHeaders(res);
+  setCorsHeaders(req, res);
+
   const host = req.headers.host || `localhost:${PORT}`;
   const url = new URL(req.url, `http://${host}`);
 
+  if (req.method === "OPTIONS" && ALLOWED_ORIGINS.length > 0) {
+    res.writeHead(204);
+    res.end();
+    return;
+  }
+
   if (url.pathname.startsWith("/api/")) {
     await handleApi(req, res, url);
+    const ms = Date.now() - start;
+    console.log(`${req.method} ${url.pathname} ${res.statusCode} ${ms}ms`);
     return;
   }
 
@@ -541,6 +565,17 @@ if (require.main === module) {
       });
     }, 6 * 60 * 60 * 1000);
     if (cleanup.unref) cleanup.unref();
+
+    function shutdown(signal) {
+      console.log(`\n${signal} received, shutting down...`);
+      clearInterval(cleanup);
+      server.close(() => {
+        db.close().then(() => process.exit(0)).catch(() => process.exit(1));
+      });
+      setTimeout(() => process.exit(1), 5000);
+    }
+    process.on("SIGTERM", () => shutdown("SIGTERM"));
+    process.on("SIGINT", () => shutdown("SIGINT"));
   }).catch((err) => {
     console.error("Failed to initialize database:", err);
     process.exit(1);
