@@ -18,6 +18,7 @@ const showLoginBtn = document.getElementById("showLoginBtn");
 const registerNameField = document.getElementById("registerNameField");
 
 const profileForm = document.getElementById("profileForm");
+const generateRoutineBtn = document.getElementById("generateRoutineBtn");
 const clearProfileBtn = document.getElementById("clearProfileBtn");
 const loadDemoBtn = document.getElementById("loadDemoBtn");
 const welcomePanel = document.getElementById("welcomePanel");
@@ -44,6 +45,7 @@ let currentRoutine = null;
 let currentUser = null;
 let savedRoutines = [];
 let isRegisterMode = false;
+let isGeneratingRoutine = false;
 const FREE_ROUTINE_LIMIT = 5;
 
 function getToken() {
@@ -82,12 +84,31 @@ async function api(path, options = {}) {
 
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
+    if (
+      response.status === 401 &&
+      token &&
+      path !== "/api/auth/login" &&
+      path !== "/api/auth/register"
+    ) {
+      handleUnauthorizedSession();
+    }
     const error = new Error(payload.error || "Request failed");
     error.code = payload.code || null;
     throw error;
   }
 
   return payload;
+}
+
+function handleUnauthorizedSession() {
+  clearToken();
+  currentUser = null;
+  currentRoutine = null;
+  savedRoutines = [];
+  renderRoutine(null);
+  renderSavedRoutines();
+  updateAuthUi();
+  setMessage("Session expired. Please log in again.", true);
 }
 
 function setMessage(message, isError = false) {
@@ -139,6 +160,11 @@ function lockPlanner(locked) {
   } else {
     savedEmptyState.textContent = "No routines saved yet.";
     routineEmptyState.textContent = "Fill out your profile to generate a training routine.";
+  }
+
+  if (locked) {
+    isGeneratingRoutine = false;
+    generateRoutineBtn.textContent = "Generate Routine";
   }
 }
 
@@ -337,7 +363,7 @@ function updateAuthUi() {
   welcomePanel.classList.toggle("hidden", !isAuthed);
   loadDemoBtn.classList.toggle("hidden", isAuthed);
   if (isAuthed) {
-    welcomeName.textContent = currentUser.name;
+    welcomeName.textContent = "";
     welcomeMessage.textContent = `Let's get better today ${currentUser.name}`;
     topMessage.classList.toggle("hidden", !topMessage.textContent);
   } else {
@@ -494,8 +520,20 @@ upgradeBtn.addEventListener("click", async () => {
 
 profileForm.addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (isGeneratingRoutine) return;
+
+  if (!profileForm.checkValidity()) {
+    profileForm.reportValidity();
+    setMessage("Complete all required profile fields before generating a routine.", true);
+    return;
+  }
 
   try {
+    isGeneratingRoutine = true;
+    generateRoutineBtn.disabled = true;
+    generateRoutineBtn.textContent = "Generating...";
+    setMessage("Generating your routine...");
+
     const profile = getProfileFromForm();
     await api("/api/profile", {
       method: "PUT",
@@ -511,6 +549,10 @@ profileForm.addEventListener("submit", async (event) => {
     setMessage("Routine generated with smart rules engine. Save it when ready.");
   } catch (err) {
     setMessage(err.message, true);
+  } finally {
+    isGeneratingRoutine = false;
+    generateRoutineBtn.disabled = false;
+    generateRoutineBtn.textContent = "Generate Routine";
   }
 });
 
