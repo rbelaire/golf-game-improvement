@@ -4,7 +4,7 @@ const path = require("path");
 const crypto = require("crypto");
 
 const db = require("./lib/db");
-const { buildRulesRoutine, validateProfileShape, normalizeProfile } = require("./lib/drills");
+const { buildRulesRoutine, validateProfileShape, normalizeProfile, DRILL_LIBRARY } = require("./lib/drills");
 const { createRateLimiter } = require("./lib/rate-limit");
 
 const PORT = process.env.PORT || 3000;
@@ -100,6 +100,9 @@ function contentType(fileName) {
   if (ext === ".css") return "text/css; charset=utf-8";
   if (ext === ".js") return "application/javascript; charset=utf-8";
   if (ext === ".json") return "application/json; charset=utf-8";
+  if (ext === ".webmanifest") return "application/manifest+json; charset=utf-8";
+  if (ext === ".svg") return "image/svg+xml";
+  if (ext === ".png") return "image/png";
   return "text/plain; charset=utf-8";
 }
 
@@ -419,6 +422,52 @@ async function handleApi(req, res, url) {
     const routineId = routineMatch[1];
     await db.deleteRoutine(auth.user.id, routineId);
     sendJson(res, 200, { ok: true });
+    return;
+  }
+
+  // Session completion toggle
+  const completionMatch = url.pathname.match(/^\/api\/routines\/([a-zA-Z0-9-]+)\/complete$/);
+  if (completionMatch && req.method === "POST") {
+    const auth = await parseAuthUser(req);
+    if (!auth) {
+      sendJson(res, 401, { error: "Unauthorized" });
+      return;
+    }
+
+    try {
+      const body = await readBody(req);
+      const key = String(body.key || "");
+      if (!/^\d+-\d+$/.test(key)) {
+        sendJson(res, 400, { error: "Invalid session key. Expected format: weekIndex-sessionIndex." });
+        return;
+      }
+      const updated = await db.toggleSessionCompletion(auth.user.id, completionMatch[1], key);
+      if (!updated) {
+        sendJson(res, 404, { error: "Routine not found." });
+        return;
+      }
+      sendJson(res, 200, { routine: updated });
+      return;
+    } catch (err) {
+      sendJson(res, 400, { error: err.message });
+      return;
+    }
+  }
+
+  if (url.pathname === "/api/drills" && req.method === "GET") {
+    sendJson(res, 200, { drills: DRILL_LIBRARY });
+    return;
+  }
+
+  if (url.pathname === "/api/stats" && req.method === "GET") {
+    const auth = await parseAuthUser(req);
+    if (!auth) {
+      sendJson(res, 401, { error: "Unauthorized" });
+      return;
+    }
+
+    const stats = await db.getUserStats(auth.user.id);
+    sendJson(res, 200, { stats });
     return;
   }
 

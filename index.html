@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>thegolfbuild</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#070707" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -25,6 +29,8 @@
         <div class="routine-nav">
           <button id="showGeneratedRoutineBtn" class="btn btn-outline active" type="button">Generated Routine</button>
           <button id="showCustomRoutineBtn" class="btn btn-outline" type="button">Custom Routine</button>
+          <button id="showDrillLibraryBtn" class="btn btn-outline" type="button">Drills</button>
+          <button id="showStatsBtn" class="btn btn-outline" type="button">Stats</button>
         </div>
         <div id="welcomePanel" class="welcome-panel hidden">
           <p id="welcomeName" class="welcome-name"></p>
@@ -153,6 +159,8 @@
               <div class="save-controls">
                 <input id="saveRoutineNameInput" type="text" placeholder="Save as (optional title)" />
                 <button id="saveRoutineBtn" class="btn btn-primary" type="button">Save to Profile</button>
+                <button id="exportPdfBtn" class="btn btn-outline" type="button">PDF</button>
+                <button id="exportIcalBtn" class="btn btn-outline" type="button">iCal</button>
               </div>
             </div>
             <div id="routineWeeks" class="routine-weeks"></div>
@@ -187,6 +195,47 @@
         </div>
       </section>
 
+      <section id="drillLibraryPanel" class="panel drill-library-panel hidden">
+        <h2>Drill Library</h2>
+        <p class="plan-mode-note">Browse all 30 drills grouped by weakness category. Click any drill to expand its description.</p>
+        <div id="drillLibraryContent" class="drill-library-content"></div>
+      </section>
+
+      <section id="statsPanel" class="panel stats-panel hidden">
+        <h2>Performance Dashboard</h2>
+        <div id="statsContent" class="stats-content">
+          <div class="stats-grid">
+            <div class="stat-card">
+              <p class="stat-value" id="statRoutines">-</p>
+              <p class="stat-label">Routines Saved</p>
+            </div>
+            <div class="stat-card">
+              <p class="stat-value" id="statCompleted">-</p>
+              <p class="stat-label">Sessions Completed</p>
+            </div>
+            <div class="stat-card">
+              <p class="stat-value" id="statStreak">-</p>
+              <p class="stat-label">Current Streak</p>
+            </div>
+            <div class="stat-card">
+              <p class="stat-value" id="statLongest">-</p>
+              <p class="stat-label">Longest Streak</p>
+            </div>
+          </div>
+          <div class="stats-detail">
+            <h3>Session Progress</h3>
+            <div class="progress-bar-wrap">
+              <div id="statProgressBar" class="progress-bar" style="width:0%"></div>
+            </div>
+            <p id="statProgressText" class="stat-progress-text">0 / 0 sessions</p>
+          </div>
+          <div class="stats-detail">
+            <h3>Weakness Coverage</h3>
+            <div id="statWeakness" class="weakness-chart"></div>
+          </div>
+        </div>
+      </section>
+
       <section class="panel saved-panel">
         <h2>Saved Routines</h2>
         <div class="usage-row">
@@ -200,9 +249,13 @@
 
     <template id="savedRoutineTemplate">
       <article class="saved-item">
-        <div>
+        <div class="saved-info">
           <p class="saved-title"></p>
           <p class="saved-meta"></p>
+          <div class="saved-progress-wrap">
+            <div class="saved-progress-bar"></div>
+          </div>
+          <p class="saved-progress-text"></p>
         </div>
         <div class="saved-actions">
           <button class="btn btn-outline load-btn" type="button">Load</button>
@@ -212,5 +265,10 @@
     </template>
 
     <script src="app.js"></script>
+    <script>
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("/sw.js").catch(() => {});
+      }
+    </script>
   </body>
 </html>

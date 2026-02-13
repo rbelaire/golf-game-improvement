@@ -17,21 +17,40 @@ npm test
 ## Project structure
 
 ```
-server.js              HTTP server, route handlers, auth helpers (~560 lines)
+server.js              HTTP server, route handlers, auth helpers
 lib/
   db.js                Database abstraction (Postgres + JSON file fallback)
-  drills.js            DRILL_LIBRARY, rules engine, profile helpers
+  drills.js            DRILL_LIBRARY (30 drills with descriptions), rules engine, profile helpers
   rate-limit.js        In-memory IP-based sliding-window rate limiter
 api/
   index.js             Vercel serverless wrapper
 data/
   db.json              Local dev database (JSON file)
 tests/
-  api.test.js          API test suite (node:test, 36 tests)
+  api.test.js          API test suite (node:test, 43 tests)
 index.html             SPA frontend
 app.js                 Frontend logic
 styles.css             Styling
+sw.js                  Service worker (PWA offline support)
+manifest.webmanifest   PWA manifest
 ```
+
+## Features
+
+### Practice Session Tracking
+Mark individual sessions complete within any saved routine. Each week shows a progress bar tracking how many sessions you've finished. Completion state syncs to the server and persists across devices.
+
+### Drill Library Browser
+Browse all 30 drills grouped by weakness category (Driving accuracy, Approach consistency, Short game touch, Putting confidence, Course management, plus cross-cutting Foundation drills). Click any drill to expand its full description, see its type (warmup/technical/pressure/transfer), and which skill levels it targets.
+
+### Performance Dashboard
+View your stats at a glance: routines saved, sessions completed, current streak, and longest streak. A session progress bar shows overall completion percentage, and a weakness coverage chart shows how your practice time is distributed across categories.
+
+### Routine Export (PDF & iCal)
+Export any routine to PDF for printing (opens a print-friendly view) or download as an `.ics` calendar file that adds each session to your phone calendar with drill details and proper time blocks.
+
+### PWA / Offline Support
+The app installs on mobile home screens via a web app manifest and service worker. Static assets are cached for offline access, and API responses use a network-first strategy with cache fallback — so you can view your current routine at the range even with spotty signal.
 
 ## Deploy to Vercel
 
@@ -67,7 +86,7 @@ On startup, `db.init()` creates three normalized tables:
 
 - **users** — id, name, email, plan, role, salt, password_hash, profile (JSONB)
 - **sessions** — token, user_id, created_at
-- **routines** — id, user_id, title, meta, profile_snapshot (JSONB), weeks (JSONB), created_at
+- **routines** — id, user_id, title, meta, profile_snapshot (JSONB), weeks (JSONB), completions (JSONB), created_at
 
 If an `app_state` table exists (legacy single-JSONB-row format), data is automatically migrated into the new tables and `app_state` is dropped.
 
@@ -97,11 +116,14 @@ Falls back to `data/db.json`. On Vercel without Postgres, writes go to `/tmp/gol
 | PUT | `/api/auth/password` | Yes | Change password |
 | GET | `/api/profile` | Yes | Get profile |
 | PUT | `/api/profile` | Yes | Update profile |
+| GET | `/api/drills` | No | List all drills with descriptions |
 | POST | `/api/routines/generate` | Yes | Generate routine (rules engine) |
 | GET | `/api/routines` | Yes | List saved routines |
 | POST | `/api/routines` | Yes | Save routine |
 | PUT | `/api/routines/:id` | Yes | Update routine |
 | DELETE | `/api/routines/:id` | Yes | Delete routine |
+| POST | `/api/routines/:id/complete` | Yes | Toggle session completion |
+| GET | `/api/stats` | Yes | Get user performance stats |
 | POST | `/api/billing/upgrade-pro` | Yes | Upgrade to Pro |
 | GET | `/api/admin/me` | Yes | Admin status check |
 | GET | `/api/admin/users` | Super | List all users |

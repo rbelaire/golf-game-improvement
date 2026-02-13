@@ -447,6 +447,243 @@ button:disabled {
   }
 }
 
+/* Drill Library */
+.drill-library-panel {
+  grid-column: span 12;
+}
+
+.drill-library-content {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.drill-category {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.drill-category-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 0.85rem;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.02);
+  font: 600 0.95rem "Rajdhani", sans-serif;
+  color: var(--green);
+  border: none;
+  width: 100%;
+  text-align: left;
+}
+
+.drill-category-header:hover {
+  background: rgba(76, 175, 80, 0.08);
+}
+
+.drill-category-header .count {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.drill-category-list {
+  display: none;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.drill-category.open .drill-category-list {
+  display: block;
+}
+
+.drill-item {
+  padding: 0.6rem 0.85rem;
+  border-top: 1px solid var(--line);
+  cursor: pointer;
+}
+
+.drill-item:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.drill-item-name {
+  margin: 0;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.drill-item-tags {
+  margin: 0.2rem 0 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.drill-item-desc {
+  display: none;
+  margin: 0.4rem 0 0;
+  font-size: 0.85rem;
+  color: #d6ead8;
+  line-height: 1.5;
+}
+
+.drill-item.expanded .drill-item-desc {
+  display: block;
+}
+
+/* Stats Dashboard */
+.stats-panel {
+  grid-column: span 12;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.8rem;
+  margin-bottom: 1rem;
+}
+
+.stat-card {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 1rem;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.stat-value {
+  margin: 0;
+  font: 700 1.8rem "Rajdhani", sans-serif;
+  color: var(--green);
+}
+
+.stat-label {
+  margin: 0.2rem 0 0;
+  font-size: 0.82rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.stats-detail {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.85rem;
+  margin-bottom: 0.8rem;
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.stats-detail h3 {
+  margin: 0 0 0.6rem;
+  font: 600 1rem "Rajdhani", sans-serif;
+}
+
+/* Progress bars */
+.progress-bar-wrap,
+.saved-progress-wrap {
+  height: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-bar,
+.saved-progress-bar {
+  height: 100%;
+  background: var(--green);
+  border-radius: 4px;
+  transition: width 300ms ease;
+}
+
+.stat-progress-text,
+.saved-progress-text {
+  margin: 0.3rem 0 0;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.saved-progress-wrap {
+  margin-top: 0.4rem;
+  height: 6px;
+}
+
+.saved-progress-text {
+  font-size: 0.78rem;
+}
+
+/* Weakness coverage chart */
+.weakness-chart {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.weakness-row {
+  display: grid;
+  grid-template-columns: 140px 1fr auto;
+  gap: 0.6rem;
+  align-items: center;
+  font-size: 0.85rem;
+}
+
+.weakness-row .bar-bg {
+  height: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.weakness-row .bar-fill {
+  height: 100%;
+  background: var(--green);
+  border-radius: 4px;
+}
+
+.weakness-row .bar-count {
+  color: var(--muted);
+  font-size: 0.82rem;
+  min-width: 30px;
+  text-align: right;
+}
+
+/* Session completion checkboxes */
+.session-check {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.session-check input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--green);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.session-check label {
+  flex-direction: row;
+  gap: 0;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.session-check.completed label {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+/* Week progress */
+.week-progress {
+  margin-top: 0.5rem;
+}
+
+.week-progress-text {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin: 0.2rem 0 0;
+}
+
 @media (max-width: 600px) {
   .inline-fields {
     grid-template-columns: 1fr;
@@ -468,5 +705,40 @@ button:disabled {
 
   .saved-actions .btn {
     flex: 1;
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .weakness-row {
+    grid-template-columns: 100px 1fr auto;
+  }
+}
+
+@media print {
+  .topbar,
+  .auth-panel,
+  .profile-panel,
+  .saved-panel,
+  .drill-library-panel,
+  .stats-panel,
+  .save-controls,
+  .bg-grid {
+    display: none !important;
+  }
+  .plan-panel {
+    grid-column: span 12;
+    border: none;
+    box-shadow: none;
+    background: none;
+  }
+  body {
+    background: white;
+    color: black;
+  }
+  .week-block {
+    border-color: #ccc;
+    break-inside: avoid;
   }
 }

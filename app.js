@@ -47,12 +47,21 @@ const savedEmptyState = document.getElementById("savedEmptyState");
 const savedList = document.getElementById("savedList");
 const savedRoutineTemplate = document.getElementById("savedRoutineTemplate");
 
+const showDrillLibraryBtn = document.getElementById("showDrillLibraryBtn");
+const showStatsBtn = document.getElementById("showStatsBtn");
+const drillLibraryPanel = document.getElementById("drillLibraryPanel");
+const drillLibraryContent = document.getElementById("drillLibraryContent");
+const statsPanel = document.getElementById("statsPanel");
+const exportPdfBtn = document.getElementById("exportPdfBtn");
+const exportIcalBtn = document.getElementById("exportIcalBtn");
+
 let currentRoutine = null;
 let currentUser = null;
 let savedRoutines = [];
 let isRegisterMode = false;
 let isGeneratingRoutine = false;
 let activePlanMode = "generated";
+let drillLibraryCache = null;
 const FREE_ROUTINE_LIMIT = 5;
 
 function profileCacheKey(userId) {
@@ -159,16 +168,39 @@ function getDisplayFirstName() {
 }
 
 function setPlanMode(mode) {
-  activePlanMode = mode === "custom" ? "custom" : "generated";
+  activePlanMode = mode;
+  const planPanel = document.querySelector(".plan-panel");
 
-  const showGenerated = activePlanMode === "generated";
-  generatedRoutineView.classList.toggle("hidden", !showGenerated);
-  customRoutineView.classList.toggle("hidden", showGenerated);
+  generatedRoutineView.classList.add("hidden");
+  customRoutineView.classList.add("hidden");
+  drillLibraryPanel.classList.add("hidden");
+  statsPanel.classList.add("hidden");
+  planPanel.classList.remove("hidden");
 
-  showGeneratedRoutineBtn.classList.toggle("active", showGenerated);
-  showCustomRoutineBtn.classList.toggle("active", !showGenerated);
+  showGeneratedRoutineBtn.classList.remove("active");
+  showCustomRoutineBtn.classList.remove("active");
+  showDrillLibraryBtn.classList.remove("active");
+  showStatsBtn.classList.remove("active");
 
-  planPanelTitle.textContent = showGenerated ? "Generated Practice Routine" : "Custom Practice Routine";
+  if (mode === "custom") {
+    customRoutineView.classList.remove("hidden");
+    showCustomRoutineBtn.classList.add("active");
+    planPanelTitle.textContent = "Custom Practice Routine";
+  } else if (mode === "drills") {
+    planPanel.classList.add("hidden");
+    drillLibraryPanel.classList.remove("hidden");
+    showDrillLibraryBtn.classList.add("active");
+    loadDrillLibrary();
+  } else if (mode === "stats") {
+    planPanel.classList.add("hidden");
+    statsPanel.classList.remove("hidden");
+    showStatsBtn.classList.add("active");
+    loadStats();
+  } else {
+    generatedRoutineView.classList.remove("hidden");
+    showGeneratedRoutineBtn.classList.add("active");
+    planPanelTitle.textContent = "Generated Practice Routine";
+  }
 }
 
 function getProfileFromForm() {
@@ -342,23 +374,54 @@ function renderRoutine(routine) {
   routineTitle.textContent = routine.title;
   routineMeta.textContent = `${routine.meta} • Created ${new Date(routine.createdAt || Date.now()).toLocaleDateString()}`;
 
+  const completions = routine.completions || {};
+  const isSaved = Boolean(routine.id);
+
   routineWeeks.innerHTML = "";
-  routine.weeks.forEach((week) => {
+  routine.weeks.forEach((week, wi) => {
     const block = document.createElement("section");
     block.className = "week-block";
 
     const heading = document.createElement("h3");
     heading.textContent = week.headline;
+    block.appendChild(heading);
 
-    const list = document.createElement("ul");
-    week.sessions.forEach((session) => {
-      const item = document.createElement("li");
-      item.textContent = `${session.title}: ${session.bullets.join(" ")}`;
-      list.appendChild(item);
+    let weekDone = 0;
+    const weekTotal = (week.sessions || []).length;
+
+    week.sessions.forEach((session, si) => {
+      const key = `${wi}-${si}`;
+      const done = Boolean(completions[key]);
+      if (done) weekDone += 1;
+
+      const row = document.createElement("div");
+      row.className = "session-check" + (done ? " completed" : "");
+
+      if (isSaved) {
+        const cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.checked = done;
+        cb.id = `sc-${wi}-${si}`;
+        cb.addEventListener("change", () => toggleCompletion(routine.id, key));
+        row.appendChild(cb);
+      }
+
+      const lbl = document.createElement("label");
+      if (isSaved) lbl.setAttribute("for", `sc-${wi}-${si}`);
+      lbl.textContent = `${session.title}: ${session.bullets.join(" ")}`;
+      row.appendChild(lbl);
+      block.appendChild(row);
     });
 
-    block.appendChild(heading);
-    block.appendChild(list);
+    if (isSaved && weekTotal > 0) {
+      const pct = Math.round((weekDone / weekTotal) * 100);
+      const prog = document.createElement("div");
+      prog.className = "week-progress";
+      prog.innerHTML = `<div class="progress-bar-wrap"><div class="progress-bar" style="width:${pct}%"></div></div>` +
+        `<p class="week-progress-text">${weekDone}/${weekTotal} sessions complete</p>`;
+      block.appendChild(prog);
+    }
+
     routineWeeks.appendChild(block);
   });
 
@@ -366,6 +429,36 @@ function renderRoutine(routine) {
   routineEmptyState.classList.add("hidden");
   saveRoutineNameInput.value = routine.title || "";
   saveRoutineNameInput.placeholder = `Save as (optional title) • ${routine.title}`;
+}
+
+async function toggleCompletion(routineId, key) {
+  try {
+    const result = await api(`/api/routines/${routineId}/complete`, {
+      method: "POST",
+      body: JSON.stringify({ key })
+    });
+    const updated = result.routine;
+    const idx = savedRoutines.findIndex((r) => r.id === routineId);
+    if (idx !== -1) savedRoutines[idx] = updated;
+    if (currentRoutine?.id === routineId) {
+      currentRoutine = updated;
+      renderRoutine(currentRoutine);
+    }
+    renderSavedRoutines();
+  } catch (err) {
+    setMessage(err.message, true);
+  }
+}
+
+function routineProgress(routine) {
+  let total = 0;
+  let done = 0;
+  const completions = routine.completions || {};
+  for (const week of routine.weeks || []) {
+    total += (week.sessions || []).length;
+  }
+  done = Object.keys(completions).length;
+  return { total, done, pct: total > 0 ? Math.round((done / total) * 100) : 0 };
 }
 
 function renderSavedRoutines() {
@@ -380,10 +473,15 @@ function renderSavedRoutines() {
     wrapper.querySelector(".saved-title").textContent = routine.title;
     wrapper.querySelector(".saved-meta").textContent = `${routine.meta} • ${new Date(routine.createdAt).toLocaleDateString()}`;
 
+    const prog = routineProgress(routine);
+    wrapper.querySelector(".saved-progress-bar").style.width = `${prog.pct}%`;
+    wrapper.querySelector(".saved-progress-text").textContent = `${prog.done}/${prog.total} sessions (${prog.pct}%)`;
+
     wrapper.querySelector(".load-btn").addEventListener("click", () => {
       currentRoutine = routine;
       renderRoutine(currentRoutine);
       hydrateForm(routine.profileSnapshot);
+      setPlanMode("generated");
     });
 
     wrapper.querySelector(".delete-btn").addEventListener("click", async () => {
@@ -619,12 +717,10 @@ submitPasswordChangeBtn.addEventListener("click", async () => {
   }
 });
 
-showGeneratedRoutineBtn.addEventListener("click", () => {
-  setPlanMode("generated");
-});
-showCustomRoutineBtn.addEventListener("click", () => {
-  setPlanMode("custom");
-});
+showGeneratedRoutineBtn.addEventListener("click", () => setPlanMode("generated"));
+showCustomRoutineBtn.addEventListener("click", () => setPlanMode("custom"));
+showDrillLibraryBtn.addEventListener("click", () => setPlanMode("drills"));
+showStatsBtn.addEventListener("click", () => setPlanMode("stats"));
 authForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (currentUser) return;
@@ -750,6 +846,191 @@ loadDemoBtn.addEventListener("click", () => {
   renderRoutine(currentRoutine);
   saveRoutineNameInput.value = currentRoutine.title;
   setMessage("Demo routine loaded. Save it to your profile if you want.");
+});
+
+// Drill Library
+async function loadDrillLibrary() {
+  if (drillLibraryCache) {
+    renderDrillLibrary(drillLibraryCache);
+    return;
+  }
+  try {
+    const result = await api("/api/drills");
+    drillLibraryCache = result.drills;
+    renderDrillLibrary(drillLibraryCache);
+  } catch (err) {
+    drillLibraryContent.innerHTML = '<p class="empty-state">Could not load drills.</p>';
+  }
+}
+
+function renderDrillLibrary(drills) {
+  const groups = {};
+  const weaknessOrder = ["Driving accuracy", "Approach consistency", "Short game touch", "Putting confidence", "Course management"];
+  for (const drill of drills) {
+    const primary = drill.weaknesses[0] || "General";
+    if (!groups[primary]) groups[primary] = [];
+    groups[primary].push(drill);
+  }
+
+  drillLibraryContent.innerHTML = "";
+  for (const weakness of weaknessOrder) {
+    const list = groups[weakness];
+    if (!list) continue;
+
+    const cat = document.createElement("div");
+    cat.className = "drill-category";
+
+    const header = document.createElement("button");
+    header.className = "drill-category-header";
+    header.innerHTML = `<span>${weakness}</span><span class="count">${list.length} drills</span>`;
+    header.addEventListener("click", () => cat.classList.toggle("open"));
+
+    const ul = document.createElement("ul");
+    ul.className = "drill-category-list";
+
+    for (const drill of list) {
+      const li = document.createElement("li");
+      li.className = "drill-item";
+      li.innerHTML = `<p class="drill-item-name">${drill.name}</p>` +
+        `<p class="drill-item-tags">${drill.type} • ${drill.levels.join(", ")}</p>` +
+        `<p class="drill-item-desc">${drill.description}</p>`;
+      li.addEventListener("click", () => li.classList.toggle("expanded"));
+      ul.appendChild(li);
+    }
+
+    cat.appendChild(header);
+    cat.appendChild(ul);
+    drillLibraryContent.appendChild(cat);
+  }
+
+  // Add general/multi-weakness drills
+  const general = drills.filter((d) => d.weaknesses.length > 2);
+  if (general.length > 0) {
+    const cat = document.createElement("div");
+    cat.className = "drill-category";
+    const header = document.createElement("button");
+    header.className = "drill-category-header";
+    header.innerHTML = `<span>Foundation & Cross-Cutting</span><span class="count">${general.length} drills</span>`;
+    header.addEventListener("click", () => cat.classList.toggle("open"));
+    const ul = document.createElement("ul");
+    ul.className = "drill-category-list";
+    for (const drill of general) {
+      const li = document.createElement("li");
+      li.className = "drill-item";
+      li.innerHTML = `<p class="drill-item-name">${drill.name}</p>` +
+        `<p class="drill-item-tags">${drill.type} • ${drill.levels.join(", ")}</p>` +
+        `<p class="drill-item-desc">${drill.description}</p>`;
+      li.addEventListener("click", () => li.classList.toggle("expanded"));
+      ul.appendChild(li);
+    }
+    cat.appendChild(header);
+    cat.appendChild(ul);
+    drillLibraryContent.appendChild(cat);
+  }
+}
+
+// Performance Dashboard
+async function loadStats() {
+  if (!currentUser) {
+    document.getElementById("statsContent").innerHTML = '<p class="empty-state">Sign in to view your stats.</p>';
+    return;
+  }
+  try {
+    const result = await api("/api/stats");
+    renderStats(result.stats);
+  } catch (err) {
+    setMessage(err.message, true);
+  }
+}
+
+function renderStats(stats) {
+  document.getElementById("statRoutines").textContent = stats.totalRoutines;
+  document.getElementById("statCompleted").textContent = stats.completedSessions;
+  document.getElementById("statStreak").textContent = stats.currentStreak + "d";
+  document.getElementById("statLongest").textContent = stats.longestStreak + "d";
+
+  const pct = stats.totalSessions > 0 ? Math.round((stats.completedSessions / stats.totalSessions) * 100) : 0;
+  document.getElementById("statProgressBar").style.width = `${pct}%`;
+  document.getElementById("statProgressText").textContent = `${stats.completedSessions} / ${stats.totalSessions} sessions (${pct}%)`;
+
+  const weaknessEl = document.getElementById("statWeakness");
+  weaknessEl.innerHTML = "";
+  const coverage = stats.weaknessCoverage || {};
+  const allWeaknesses = ["Driving accuracy", "Approach consistency", "Short game touch", "Putting confidence", "Course management"];
+  const maxCount = Math.max(1, ...Object.values(coverage));
+
+  for (const w of allWeaknesses) {
+    const count = coverage[w] || 0;
+    const barPct = Math.round((count / maxCount) * 100);
+    const row = document.createElement("div");
+    row.className = "weakness-row";
+    row.innerHTML = `<span>${w}</span>` +
+      `<div class="bar-bg"><div class="bar-fill" style="width:${barPct}%"></div></div>` +
+      `<span class="bar-count">${count}</span>`;
+    weaknessEl.appendChild(row);
+  }
+}
+
+// PDF Export
+exportPdfBtn.addEventListener("click", () => {
+  if (!currentRoutine) return;
+  const w = window.open("", "_blank");
+  const r = currentRoutine;
+  let html = `<!DOCTYPE html><html><head><title>${r.title}</title>` +
+    `<style>body{font-family:sans-serif;max-width:800px;margin:0 auto;padding:20px}` +
+    `h1{font-size:1.4rem}h2{font-size:1.1rem;margin-top:1.5rem;border-bottom:2px solid #4caf50;padding-bottom:4px}` +
+    `.meta{color:#666;font-size:0.9rem}ul{padding-left:1.2rem}li{margin-bottom:6px;font-size:0.9rem}` +
+    `.check{color:#4caf50;font-weight:bold}</style></head><body>`;
+  html += `<h1>${r.title}</h1><p class="meta">${r.meta}</p>`;
+  const completions = r.completions || {};
+  r.weeks.forEach((week, wi) => {
+    html += `<h2>${week.headline}</h2><ul>`;
+    week.sessions.forEach((session, si) => {
+      const done = completions[`${wi}-${si}`];
+      const mark = done ? '<span class="check"> [done]</span>' : "";
+      html += `<li><strong>${session.title}</strong>${mark}: ${session.bullets.join(" ")}</li>`;
+    });
+    html += "</ul>";
+  });
+  html += `<script>window.print();<\/script></body></html>`;
+  w.document.write(html);
+  w.document.close();
+});
+
+// iCal Export
+exportIcalBtn.addEventListener("click", () => {
+  if (!currentRoutine) return;
+  const r = currentRoutine;
+  const now = new Date();
+  let ical = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//thegolfbuild//EN\r\nCALSCALE:GREGORIAN\r\n";
+
+  r.weeks.forEach((week, wi) => {
+    week.sessions.forEach((session, si) => {
+      const dayOffset = wi * 7 + si;
+      const start = new Date(now);
+      start.setDate(start.getDate() + dayOffset);
+      const dateStr = start.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+      const endDate = new Date(start.getTime() + (r.profileSnapshot?.hoursPerSession || 1.5) * 3600000);
+      const endStr = endDate.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+      const desc = session.bullets.join("\\n").replace(/,/g, "\\,");
+      ical += "BEGIN:VEVENT\r\n";
+      ical += `DTSTART:${dateStr}\r\n`;
+      ical += `DTEND:${endStr}\r\n`;
+      ical += `SUMMARY:${r.title} - ${week.headline} ${session.title}\r\n`;
+      ical += `DESCRIPTION:${desc}\r\n`;
+      ical += `UID:${r.id || "demo"}-${wi}-${si}@thegolfbuild\r\n`;
+      ical += "END:VEVENT\r\n";
+    });
+  });
+
+  ical += "END:VCALENDAR\r\n";
+  const blob = new Blob([ical], { type: "text/calendar;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${(r.title || "routine").replace(/[^a-zA-Z0-9]/g, "_")}.ics`;
+  a.click();
+  URL.revokeObjectURL(url);
 });
 
 customRoutineForm.addEventListener("submit", (event) => {
