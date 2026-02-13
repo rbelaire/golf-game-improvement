@@ -7,6 +7,7 @@ const PORT = process.env.PORT || 3000;
 const DB_DIR = process.env.DB_DIR || (process.env.VERCEL ? "/tmp/golf-game-improvement" : path.join(__dirname, "data"));
 const DB_PATH = path.join(DB_DIR, "db.json");
 const DATABASE_URL = process.env.DATABASE_URL || "";
+const SUPER_USER_NAME = String(process.env.SUPER_USER_NAME || "").trim();
 const SUPER_USER_EMAIL = String(process.env.SUPER_USER_EMAIL || "").trim().toLowerCase();
 const SUPER_USER_PASSWORD = String(process.env.SUPER_USER_PASSWORD || "");
 
@@ -180,7 +181,7 @@ function maybeBootstrapSuperUser(db) {
     const passwordHash = hashPassword(SUPER_USER_PASSWORD, salt);
     user = {
       id: crypto.randomUUID(),
-      name: SUPER_USER_EMAIL.split("@")[0],
+      name: SUPER_USER_NAME || SUPER_USER_EMAIL.split("@")[0],
       email: SUPER_USER_EMAIL,
       plan: "pro",
       role: "super",
@@ -192,6 +193,10 @@ function maybeBootstrapSuperUser(db) {
     db.users.push(user);
     changed = true;
   } else {
+    if (SUPER_USER_NAME && user.name !== SUPER_USER_NAME) {
+      user.name = SUPER_USER_NAME;
+      changed = true;
+    }
     if (user.role !== "super") {
       user.role = "super";
       changed = true;

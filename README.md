@@ -34,6 +34,7 @@ Routines are generated entirely by the built-in rules engine (no AI provider or 
 ## Super user bootstrap
 
 To ensure a super user exists in the active database, set:
+- `SUPER_USER_NAME` (optional display name)
 - `SUPER_USER_EMAIL`
 - `SUPER_USER_PASSWORD` (minimum 8 chars)
 

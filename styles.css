@@ -319,6 +319,16 @@ button:disabled {
   justify-content: space-between;
 }
 
+.save-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+#saveRoutineNameInput {
+  min-width: 220px;
+}
+
 .empty-state {
   border: 1px dashed var(--line);
   border-radius: 10px;

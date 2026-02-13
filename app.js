@@ -32,6 +32,7 @@ const welcomeMessage = document.getElementById("welcomeMessage");
 const topLogoutBtn = document.getElementById("topLogoutBtn");
 const topMessage = document.getElementById("topMessage");
 const saveRoutineBtn = document.getElementById("saveRoutineBtn");
+const saveRoutineNameInput = document.getElementById("saveRoutineNameInput");
 const customRoutineForm = document.getElementById("customRoutineForm");
 const upgradeBtn = document.getElementById("upgradeBtn");
 const usageText = document.getElementById("usageText");
@@ -53,6 +54,30 @@ let isRegisterMode = false;
 let isGeneratingRoutine = false;
 let activePlanMode = "generated";
 const FREE_ROUTINE_LIMIT = 5;
+
+function profileCacheKey(userId) {
+  return `thegolfbuild_profile_${userId}`;
+}
+
+function getCachedProfile(userId) {
+  if (!userId) return null;
+  try {
+    const raw = localStorage.getItem(profileCacheKey(userId));
+    return raw ? JSON.parse(raw) : null;
+  } catch (_err) {
+    return null;
+  }
+}
+
+function setCachedProfile(userId, profile) {
+  if (!userId) return;
+  localStorage.setItem(profileCacheKey(userId), JSON.stringify(profile || null));
+}
+
+function clearCachedProfile(userId) {
+  if (!userId) return;
+  localStorage.removeItem(profileCacheKey(userId));
+}
 
 function getToken() {
   return (
@@ -125,6 +150,14 @@ function setMessage(message, isError = false) {
   topMessage.classList.toggle("hidden", !currentUser || !message);
 }
 
+function getDisplayFirstName() {
+  const raw = String(currentUser?.name || "").trim();
+  if (!raw) return "Player";
+  const cleaned = raw.includes("@") ? raw.split("@")[0] : raw;
+  const first = cleaned.split(/\s+/)[0];
+  return first.charAt(0).toUpperCase() + first.slice(1);
+}
+
 function setPlanMode(mode) {
   activePlanMode = mode === "custom" ? "custom" : "generated";
 
@@ -167,6 +200,7 @@ function lockPlanner(locked) {
   });
 
   saveRoutineBtn.disabled = locked;
+  saveRoutineNameInput.disabled = locked;
   loadDemoBtn.disabled = locked;
   showGeneratedRoutineBtn.disabled = locked;
   showCustomRoutineBtn.disabled = locked;
@@ -301,6 +335,7 @@ function renderRoutine(routine) {
     routineCard.classList.add("hidden");
     routineEmptyState.classList.remove("hidden");
     routineWeeks.innerHTML = "";
+    saveRoutineNameInput.value = "";
     return;
   }
 
@@ -329,6 +364,8 @@ function renderRoutine(routine) {
 
   routineCard.classList.remove("hidden");
   routineEmptyState.classList.add("hidden");
+  saveRoutineNameInput.value = routine.title || "";
+  saveRoutineNameInput.placeholder = `Save as (optional title) • ${routine.title}`;
 }
 
 function renderSavedRoutines() {
@@ -370,7 +407,9 @@ function renderSavedRoutines() {
 
 async function loadUserData() {
   const [profileRes, routineRes] = await Promise.all([api("/api/profile"), api("/api/routines")]);
-  hydrateForm(profileRes.profile || { name: currentUser.name });
+  const profile = profileRes.profile || getCachedProfile(currentUser.id) || { name: currentUser.name };
+  hydrateForm(profile);
+  setCachedProfile(currentUser.id, profile);
   savedRoutines = routineRes.routines || [];
   renderSavedRoutines();
   currentRoutine = null;
@@ -386,7 +425,7 @@ function updateAuthUi() {
   loadDemoBtn.classList.toggle("hidden", isAuthed);
   if (isAuthed) {
     welcomeName.textContent = "";
-    welcomeMessage.textContent = `Let's get better today ${currentUser.name}`;
+    welcomeMessage.textContent = `Let's get better today ${getDisplayFirstName()}`;
     topMessage.classList.toggle("hidden", !topMessage.textContent);
   } else {
     welcomeName.textContent = "";
@@ -567,6 +606,7 @@ profileForm.addEventListener("submit", async (event) => {
       method: "PUT",
       body: JSON.stringify({ profile })
     });
+    setCachedProfile(currentUser?.id, profile);
 
     const generation = await api("/api/routines/generate", {
       method: "POST",
@@ -588,9 +628,14 @@ saveRoutineBtn.addEventListener("click", async () => {
   if (!currentRoutine) return;
 
   try {
+    const customSaveName = saveRoutineNameInput.value.trim();
+    const routineToSave = customSaveName
+      ? { ...currentRoutine, title: customSaveName }
+      : currentRoutine;
+
     const result = await api("/api/routines", {
       method: "POST",
-      body: JSON.stringify({ routine: currentRoutine })
+      body: JSON.stringify({ routine: routineToSave })
     });
 
     savedRoutines = [result.routine, ...savedRoutines];
@@ -620,6 +665,7 @@ clearProfileBtn.addEventListener("click", async () => {
       method: "PUT",
       body: JSON.stringify({ profile: null })
     });
+    clearCachedProfile(currentUser?.id);
     setMessage("Profile inputs cleared.");
   } catch (err) {
     setMessage(err.message, true);
@@ -639,6 +685,7 @@ loadDemoBtn.addEventListener("click", () => {
   hydrateForm(demoProfile);
   currentRoutine = generateRoutine(demoProfile);
   renderRoutine(currentRoutine);
+  saveRoutineNameInput.value = currentRoutine.title;
   setMessage("Demo routine loaded. Save it to your profile if you want.");
 });
 
@@ -648,6 +695,7 @@ customRoutineForm.addEventListener("submit", (event) => {
   try {
     currentRoutine = buildCustomRoutine();
     renderRoutine(currentRoutine);
+    saveRoutineNameInput.value = currentRoutine.title;
     setMessage("Custom routine created. Save it to your profile.");
   } catch (err) {
     setMessage(err.message, true);
