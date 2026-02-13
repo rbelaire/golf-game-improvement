@@ -34,3 +34,11 @@ To enable AI-generated routines, set:
 - `OPENAI_MODEL` (optional, defaults to `gpt-4o-mini`)
 
 If `OPENAI_API_KEY` is missing or the AI response is invalid, the server automatically falls back to the built-in deterministic routine generator.
+
+## Super user bootstrap
+
+To ensure a super user exists in the active database, set:
+- `SUPER_USER_EMAIL`
+- `SUPER_USER_PASSWORD` (minimum 8 chars)
+
+When both are set, the API bootstraps that account as `role: "super"` and `plan: "pro"` on requests, creating it if missing and updating password/role/plan if needed.

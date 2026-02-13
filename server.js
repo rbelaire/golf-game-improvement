@@ -9,6 +9,8 @@ const DB_PATH = path.join(DB_DIR, "db.json");
 const DATABASE_URL = process.env.DATABASE_URL || "";
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
+const SUPER_USER_EMAIL = String(process.env.SUPER_USER_EMAIL || "").trim().toLowerCase();
+const SUPER_USER_PASSWORD = String(process.env.SUPER_USER_PASSWORD || "");
 
 let pgClientPromise = null;
 
@@ -161,6 +163,53 @@ function publicUser(user) {
     plan: user.plan || "free",
     role: userRole(user)
   };
+}
+
+function maybeBootstrapSuperUser(db) {
+  if (!SUPER_USER_EMAIL || !SUPER_USER_PASSWORD) {
+    return false;
+  }
+
+  if (SUPER_USER_PASSWORD.length < 8) {
+    return false;
+  }
+
+  let changed = false;
+  let user = db.users.find((item) => item.email === SUPER_USER_EMAIL);
+
+  if (!user) {
+    const salt = crypto.randomBytes(16).toString("hex");
+    const passwordHash = hashPassword(SUPER_USER_PASSWORD, salt);
+    user = {
+      id: crypto.randomUUID(),
+      name: SUPER_USER_EMAIL.split("@")[0],
+      email: SUPER_USER_EMAIL,
+      plan: "pro",
+      role: "super",
+      salt,
+      passwordHash,
+      profile: null,
+      routines: []
+    };
+    db.users.push(user);
+    changed = true;
+  } else {
+    if (user.role !== "super") {
+      user.role = "super";
+      changed = true;
+    }
+    if ((user.plan || "free") !== "pro") {
+      user.plan = "pro";
+      changed = true;
+    }
+    const incomingHash = hashPassword(SUPER_USER_PASSWORD, user.salt);
+    if (incomingHash !== user.passwordHash) {
+      user.passwordHash = incomingHash;
+      changed = true;
+    }
+  }
+
+  return changed;
 }
 
 function isSafeStaticPath(filePath) {
@@ -378,6 +427,9 @@ async function generateRoutineWithAi(profile) {
 
 async function handleApi(req, res, url) {
   const db = await readDb();
+  if (maybeBootstrapSuperUser(db)) {
+    await writeDb(db);
+  }
 
   if (url.pathname === "/api/auth/register" && req.method === "POST") {
     try {
