@@ -4,8 +4,17 @@ const path = require("path");
 const crypto = require("crypto");
 
 const PORT = process.env.PORT || 3000;
-const DB_DIR = path.join(__dirname, "data");
+const DB_DIR = process.env.DB_DIR || (process.env.VERCEL ? "/tmp/golf-game-improvement" : path.join(__dirname, "data"));
 const DB_PATH = path.join(DB_DIR, "db.json");
+const DATABASE_URL = process.env.DATABASE_URL || "";
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
+const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
+
+let pgClientPromise = null;
+
+function getEmptyDb() {
+  return { users: [], sessions: [] };
+}
 
 function ensureDb() {
   if (!fs.existsSync(DB_DIR)) {
@@ -13,16 +22,67 @@ function ensureDb() {
   }
 
   if (!fs.existsSync(DB_PATH)) {
-    fs.writeFileSync(DB_PATH, JSON.stringify({ users: [], sessions: [] }, null, 2));
+    fs.writeFileSync(DB_PATH, JSON.stringify(getEmptyDb(), null, 2));
   }
 }
 
-function readDb() {
+async function getPgClient() {
+  if (!DATABASE_URL) {
+    return null;
+  }
+
+  if (!pgClientPromise) {
+    const { Client } = require("pg");
+    const client = new Client({
+      connectionString: DATABASE_URL,
+      ssl: process.env.PGSSLMODE === "disable" ? false : { rejectUnauthorized: false }
+    });
+
+    pgClientPromise = client.connect().then(async () => {
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS app_state (
+          id INTEGER PRIMARY KEY,
+          data JSONB NOT NULL
+        )
+      `);
+      return client;
+    });
+  }
+
+  return pgClientPromise;
+}
+
+async function readDb() {
+  const pgClient = await getPgClient();
+  if (pgClient) {
+    const result = await pgClient.query("SELECT data FROM app_state WHERE id = $1", [1]);
+    if (result.rows.length > 0) {
+      return result.rows[0].data;
+    }
+
+    const freshDb = getEmptyDb();
+    await pgClient.query("INSERT INTO app_state (id, data) VALUES ($1, $2::jsonb)", [1, JSON.stringify(freshDb)]);
+    return freshDb;
+  }
+
   ensureDb();
   return JSON.parse(fs.readFileSync(DB_PATH, "utf8"));
 }
 
-function writeDb(db) {
+async function writeDb(db) {
+  const pgClient = await getPgClient();
+  if (pgClient) {
+    await pgClient.query(
+      `
+      INSERT INTO app_state (id, data)
+      VALUES ($1, $2::jsonb)
+      ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data
+      `,
+      [1, JSON.stringify(db)]
+    );
+    return;
+  }
+
   fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2));
 }
 
@@ -99,8 +159,207 @@ function contentType(fileName) {
   return "text/plain; charset=utf-8";
 }
 
+function asString(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function asNumber(value, fallback = 0) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function validateProfileShape(profile) {
+  if (!profile || typeof profile !== "object") return false;
+  const name = asString(profile.name);
+  const handicap = asString(profile.handicap);
+  const weakness = asString(profile.weakness);
+  const daysPerWeek = asNumber(profile.daysPerWeek);
+  const hoursPerSession = asNumber(profile.hoursPerSession);
+  return Boolean(name && handicap && weakness && daysPerWeek > 0 && hoursPerSession > 0);
+}
+
+function normalizeProfile(profile) {
+  return {
+    name: asString(profile.name),
+    handicap: asString(profile.handicap),
+    weakness: asString(profile.weakness),
+    daysPerWeek: Math.max(1, Math.min(7, Math.round(asNumber(profile.daysPerWeek, 3)))),
+    hoursPerSession: Math.max(0.5, Math.min(4, Math.round(asNumber(profile.hoursPerSession, 1.5) * 2) / 2)),
+    notes: asString(profile.notes)
+  };
+}
+
+function focusMapByWeakness(weakness) {
+  const mapping = {
+    "Driving accuracy": ["fairway finder drill", "launch window control", "pressure tee shots"],
+    "Approach consistency": ["distance ladder work", "shot-shape rehearsal", "target proximity challenge"],
+    "Short game touch": ["landing zone precision", "up-and-down circuits", "bunker variability"],
+    "Putting confidence": ["start-line gate drill", "3-6-9 pressure ladder", "green reading reps"],
+    "Course management": ["club selection simulation", "risk/reward decision reps", "post-round strategy review"]
+  };
+  return mapping[weakness] || ["full swing calibration", "short game fundamentals", "mental reset routine"];
+}
+
+function intensityForHandicap(handicap) {
+  if (handicap.includes("Beginner")) return "Fundamentals first";
+  if (handicap.includes("Intermediate")) return "Skill consolidation";
+  return "Performance sharpening";
+}
+
+function buildSessionBlock(dayIndex, profile, focusAreas) {
+  const totalMinutes = Math.round(profile.hoursPerSession * 60);
+  const warmUp = Math.max(10, Math.round(totalMinutes * 0.15));
+  const core = Math.max(20, Math.round(totalMinutes * 0.6));
+  const performance = Math.max(10, totalMinutes - warmUp - core);
+  const focus = focusAreas[dayIndex % focusAreas.length];
+  return [
+    `${warmUp} min warm-up: mobility + tempo swings + putting pace check.`,
+    `${core} min core skill focus: ${focus}.`,
+    `${performance} min transfer segment: on-course simulation and score target challenge.`,
+    "5 min reflection: journal one win, one weakness, one adjustment for next session."
+  ];
+}
+
+function buildDeterministicRoutine(profileInput) {
+  const profile = normalizeProfile(profileInput);
+  const focusAreas = focusMapByWeakness(profile.weakness);
+  const intensity = intensityForHandicap(profile.handicap);
+  const weeks = [];
+
+  for (let week = 1; week <= 4; week += 1) {
+    const sessions = [];
+    for (let day = 1; day <= profile.daysPerWeek; day += 1) {
+      sessions.push({
+        title: `Session ${day}`,
+        bullets: buildSessionBlock(day + week, profile, focusAreas)
+      });
+    }
+
+    weeks.push({
+      week,
+      headline: `Week ${week}: ${intensity}`,
+      sessions
+    });
+  }
+
+  return {
+    profileSnapshot: profile,
+    title: `${profile.name}'s 4-Week ${profile.weakness} Plan`,
+    meta: `${profile.handicap} • ${profile.daysPerWeek} days/week • ${profile.hoursPerSession} hr/session`,
+    weeks
+  };
+}
+
+function isValidRoutine(routine) {
+  if (!routine || typeof routine !== "object") return false;
+  if (!asString(routine.title) || !asString(routine.meta)) return false;
+  if (!Array.isArray(routine.weeks) || routine.weeks.length === 0) return false;
+
+  for (const week of routine.weeks) {
+    if (!week || typeof week !== "object") return false;
+    if (!Number.isInteger(week.week) || week.week < 1) return false;
+    if (!asString(week.headline)) return false;
+    if (!Array.isArray(week.sessions) || week.sessions.length === 0) return false;
+    for (const session of week.sessions) {
+      if (!session || typeof session !== "object") return false;
+      if (!asString(session.title)) return false;
+      if (!Array.isArray(session.bullets) || session.bullets.length === 0) return false;
+      if (session.bullets.some((bullet) => !asString(bullet))) return false;
+    }
+  }
+
+  return true;
+}
+
+function normalizeRoutine(profile, routine) {
+  return {
+    profileSnapshot: profile,
+    title: asString(routine.title),
+    meta: asString(routine.meta),
+    weeks: routine.weeks.map((week, index) => ({
+      week: Number.isInteger(week.week) && week.week > 0 ? week.week : index + 1,
+      headline: asString(week.headline),
+      sessions: week.sessions.map((session, sessionIndex) => ({
+        title: asString(session.title) || `Session ${sessionIndex + 1}`,
+        bullets: session.bullets.map((bullet) => asString(bullet))
+      }))
+    }))
+  };
+}
+
+async function generateRoutineWithAi(profile) {
+  const systemPrompt = [
+    "You are a golf performance coach. Return strict JSON only.",
+    "Design a practical routine based on the golfer profile.",
+    "No markdown, no code fences, no extra keys."
+  ].join(" ");
+  const userPrompt = JSON.stringify({
+    task: "Generate a routine",
+    outputShape: {
+      title: "string",
+      meta: "string",
+      weeks: [
+        {
+          week: "number",
+          headline: "string",
+          sessions: [{ title: "string", bullets: ["string"] }]
+        }
+      ]
+    },
+    constraints: [
+      "Plan should match requested daysPerWeek and hoursPerSession",
+      "4 to 6 weeks total",
+      "Each session should include 3 to 5 concise bullets",
+      "Tailor drills to stated weakness and handicap",
+      "Keep language actionable"
+    ],
+    profile
+  });
+
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${OPENAI_API_KEY}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      model: OPENAI_MODEL,
+      temperature: 0.7,
+      response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt }
+      ]
+    })
+  });
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(`AI provider error (${response.status}): ${message.slice(0, 300)}`);
+  }
+
+  const payload = await response.json();
+  const content = payload?.choices?.[0]?.message?.content;
+  if (!content || typeof content !== "string") {
+    throw new Error("AI provider returned no content.");
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(content);
+  } catch (_err) {
+    throw new Error("AI response was not valid JSON.");
+  }
+
+  if (!isValidRoutine(parsed)) {
+    throw new Error("AI response did not match routine schema.");
+  }
+
+  return normalizeRoutine(profile, parsed);
+}
+
 async function handleApi(req, res, url) {
-  const db = readDb();
+  const db = await readDb();
 
   if (url.pathname === "/api/auth/register" && req.method === "POST") {
     try {
@@ -138,7 +397,7 @@ async function handleApi(req, res, url) {
       };
       db.users.push(user);
       const token = issueToken(db, user.id);
-      writeDb(db);
+      await writeDb(db);
 
       sendJson(res, 201, {
         token,
@@ -170,7 +429,7 @@ async function handleApi(req, res, url) {
       }
 
       const token = issueToken(db, user.id);
-      writeDb(db);
+      await writeDb(db);
       sendJson(res, 200, {
         token,
         user: { id: user.id, name: user.name, email: user.email, plan: user.plan || "free" }
@@ -208,7 +467,7 @@ async function handleApi(req, res, url) {
     }
 
     db.sessions = db.sessions.filter((item) => item.token !== auth.token);
-    writeDb(db);
+    await writeDb(db);
     sendJson(res, 200, { ok: true });
     return;
   }
@@ -235,7 +494,7 @@ async function handleApi(req, res, url) {
       const body = await readBody(req);
       const user = db.users.find((item) => item.id === auth.user.id);
       user.profile = body.profile || null;
-      writeDb(db);
+      await writeDb(db);
       sendJson(res, 200, { profile: user.profile });
       return;
     } catch (err) {
@@ -253,6 +512,45 @@ async function handleApi(req, res, url) {
 
     sendJson(res, 200, { routines: auth.user.routines || [] });
     return;
+  }
+
+  if (url.pathname === "/api/routines/generate" && req.method === "POST") {
+    const auth = parseAuthUser(req, db);
+    if (!auth) {
+      sendJson(res, 401, { error: "Unauthorized" });
+      return;
+    }
+
+    try {
+      const body = await readBody(req);
+      if (!validateProfileShape(body.profile)) {
+        sendJson(res, 400, { error: "A valid profile payload is required." });
+        return;
+      }
+
+      const profile = normalizeProfile(body.profile);
+      let routine = null;
+      let source = "fallback";
+
+      if (OPENAI_API_KEY) {
+        try {
+          routine = await generateRoutineWithAi(profile);
+          source = "ai";
+        } catch (err) {
+          console.error("AI routine generation failed, using fallback:", err.message);
+        }
+      }
+
+      if (!routine) {
+        routine = buildDeterministicRoutine(profile);
+      }
+
+      sendJson(res, 200, { routine, source });
+      return;
+    } catch (err) {
+      sendJson(res, 400, { error: err.message });
+      return;
+    }
   }
 
   if (url.pathname === "/api/routines" && req.method === "POST") {
@@ -289,7 +587,7 @@ async function handleApi(req, res, url) {
       };
 
       user.routines = [newRoutine, ...(user.routines || [])];
-      writeDb(db);
+      await writeDb(db);
       sendJson(res, 201, { routine: newRoutine, plan: currentPlan });
       return;
     } catch (err) {
@@ -309,7 +607,7 @@ async function handleApi(req, res, url) {
     const routineId = routineMatch[1];
     const user = db.users.find((item) => item.id === auth.user.id);
     user.routines = (user.routines || []).filter((routine) => routine.id !== routineId);
-    writeDb(db);
+    await writeDb(db);
     sendJson(res, 200, { ok: true });
     return;
   }
@@ -323,7 +621,7 @@ async function handleApi(req, res, url) {
 
     const user = db.users.find((item) => item.id === auth.user.id);
     user.plan = "pro";
-    writeDb(db);
+    await writeDb(db);
     sendJson(res, 200, {
       user: { id: user.id, name: user.name, email: user.email, plan: user.plan }
     });
@@ -347,7 +645,7 @@ function handleStatic(req, res, url) {
   fs.createReadStream(filePath).pipe(res);
 }
 
-const server = http.createServer(async (req, res) => {
+async function requestHandler(req, res, options = {}) {
   const host = req.headers.host || `localhost:${PORT}`;
   const url = new URL(req.url, `http://${host}`);
 
@@ -356,10 +654,32 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  handleStatic(req, res, url);
-});
+  if (options.apiOnly) {
+    sendJson(res, 404, { error: "Not found" });
+    return;
+  }
 
-server.listen(PORT, () => {
-  ensureDb();
-  console.log(`thegolfbuild server running on http://localhost:${PORT}`);
-});
+  handleStatic(req, res, url);
+}
+
+function createServer() {
+  return http.createServer((req, res) => {
+    requestHandler(req, res).catch((err) => {
+      console.error(err);
+      sendJson(res, 500, { error: "Internal server error" });
+    });
+  });
+}
+
+if (require.main === module) {
+  const server = createServer();
+  server.listen(PORT, () => {
+    ensureDb();
+    console.log(`thegolfbuild server running on http://localhost:${PORT}`);
+  });
+}
+
+module.exports = {
+  createServer,
+  requestHandler
+};

@@ -433,9 +433,17 @@ profileForm.addEventListener("submit", async (event) => {
       body: JSON.stringify({ profile })
     });
 
-    currentRoutine = generateRoutine(profile);
+    const generation = await api("/api/routines/generate", {
+      method: "POST",
+      body: JSON.stringify({ profile })
+    });
+    currentRoutine = generation.routine;
     renderRoutine(currentRoutine);
-    setMessage("Routine generated. Save it when ready.");
+    if (generation.source === "ai") {
+      setMessage("AI routine generated. Save it when ready.");
+    } else {
+      setMessage("Routine generated with fallback engine. Save it when ready.");
+    }
   } catch (err) {
     setMessage(err.message, true);
   }
