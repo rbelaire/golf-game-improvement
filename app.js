@@ -26,11 +26,25 @@ const showCustomRoutineBtn = document.getElementById("showCustomRoutineBtn");
 const generatedRoutineView = document.getElementById("generatedRoutineView");
 const customRoutineView = document.getElementById("customRoutineView");
 const planPanelTitle = document.getElementById("planPanelTitle");
-const welcomePanel = document.getElementById("welcomePanel");
-const welcomeName = document.getElementById("welcomeName");
+const userMenuWrap = document.getElementById("userMenuWrap");
+const userMenuBtn = document.getElementById("userMenuBtn");
+const userMenuDropdown = document.getElementById("userMenuDropdown");
+const userMenuName = document.getElementById("userMenuName");
 const welcomeMessage = document.getElementById("welcomeMessage");
 const topLogoutBtn = document.getElementById("topLogoutBtn");
 const topMessage = document.getElementById("topMessage");
+
+const confirmModal = document.getElementById("confirmModal");
+const confirmModalClose = document.getElementById("confirmModalClose");
+const confirmModalTitle = document.getElementById("confirmModalTitle");
+const confirmModalMessage = document.getElementById("confirmModalMessage");
+const confirmModalOk = document.getElementById("confirmModalOk");
+const confirmModalCancel = document.getElementById("confirmModalCancel");
+
+const showSavedBtn = document.getElementById("showSavedBtn");
+const savedPanel = document.querySelector(".saved-panel");
+const drillSearchInput = document.getElementById("drillSearchInput");
+const drillResultCount = document.getElementById("drillResultCount");
 const saveRoutineBtn = document.getElementById("saveRoutineBtn");
 const saveRoutineNameInput = document.getElementById("saveRoutineNameInput");
 const customRoutineForm = document.getElementById("customRoutineForm");
@@ -57,6 +71,23 @@ const exportIcalBtn = document.getElementById("exportIcalBtn");
 const toastContainer = document.getElementById("toastContainer");
 const onboardingOverlay = document.getElementById("onboardingOverlay");
 
+const themeToggleBtn = document.getElementById("themeToggleBtn");
+const themeIcon = document.getElementById("themeIcon");
+const drillModal = document.getElementById("drillModal");
+const drillModalClose = document.getElementById("drillModalClose");
+const drillModalName = document.getElementById("drillModalName");
+const drillModalBadges = document.getElementById("drillModalBadges");
+const drillModalDesc = document.getElementById("drillModalDesc");
+const drillModalSwap = document.getElementById("drillModalSwap");
+const drillModalAlternatives = document.getElementById("drillModalAlternatives");
+const reflectionModal = document.getElementById("reflectionModal");
+const reflectionModalClose = document.getElementById("reflectionModalClose");
+const reflectionStars = document.getElementById("reflectionStars");
+const reflectionNote = document.getElementById("reflectionNote");
+const reflectionTags = document.getElementById("reflectionTags");
+const reflectionSaveBtn = document.getElementById("reflectionSaveBtn");
+const reflectionSkipBtn = document.getElementById("reflectionSkipBtn");
+
 let currentRoutine = null;
 let currentUser = null;
 let savedRoutines = [];
@@ -64,7 +95,376 @@ let isRegisterMode = false;
 let isGeneratingRoutine = false;
 let activePlanMode = "generated";
 let drillLibraryCache = null;
+let pendingReflection = null;
 const FREE_ROUTINE_LIMIT = 5;
+
+// ===== Theme Toggle =====
+function initTheme() {
+  const saved = localStorage.getItem("thegolfbuild_theme") || "dark";
+  document.documentElement.setAttribute("data-theme", saved);
+  themeIcon.textContent = saved === "light" ? "\u263E" : "\u2606";
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.content = saved === "light" ? "#f5f7f5" : "#070707";
+}
+
+themeToggleBtn.addEventListener("click", () => {
+  const current = document.documentElement.getAttribute("data-theme");
+  const next = current === "dark" ? "light" : "dark";
+  document.documentElement.setAttribute("data-theme", next);
+  localStorage.setItem("thegolfbuild_theme", next);
+  themeIcon.textContent = next === "light" ? "\u263E" : "\u2606";
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.content = next === "light" ? "#f5f7f5" : "#070707";
+});
+
+// ===== Confirm Modal =====
+let confirmCallback = null;
+
+function openConfirmModal(title, message, onConfirm) {
+  confirmModalTitle.textContent = title;
+  confirmModalMessage.textContent = message;
+  confirmCallback = onConfirm;
+  confirmModal.classList.remove("hidden");
+}
+
+function closeConfirmModal() {
+  confirmModal.classList.add("hidden");
+  confirmCallback = null;
+}
+
+confirmModalOk.addEventListener("click", () => {
+  if (confirmCallback) confirmCallback();
+  closeConfirmModal();
+});
+
+confirmModalCancel.addEventListener("click", closeConfirmModal);
+confirmModalClose.addEventListener("click", closeConfirmModal);
+confirmModal.addEventListener("click", (e) => {
+  if (e.target === confirmModal) closeConfirmModal();
+});
+
+// ===== User Menu =====
+userMenuBtn.addEventListener("click", (e) => {
+  e.stopPropagation();
+  userMenuDropdown.classList.toggle("hidden");
+});
+
+document.addEventListener("click", (e) => {
+  if (!userMenuWrap.contains(e.target)) {
+    userMenuDropdown.classList.add("hidden");
+  }
+});
+
+// ===== Escape Key for Modals =====
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    if (!confirmModal.classList.contains("hidden")) { closeConfirmModal(); return; }
+    if (!reflectionModal.classList.contains("hidden")) { closeReflectionModal(); return; }
+    if (!drillModal.classList.contains("hidden")) { closeDrillModal(); return; }
+    if (!onboardingOverlay.classList.contains("hidden")) {
+      onboardingOverlay.classList.add("hidden");
+      localStorage.setItem("thegolfbuild_onboarded", "1");
+    }
+  }
+});
+
+// ===== Password Visibility Toggle =====
+document.querySelectorAll(".password-toggle").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const input = document.getElementById(btn.dataset.target);
+    if (!input) return;
+    const isPassword = input.type === "password";
+    input.type = isPassword ? "text" : "password";
+    btn.textContent = isPassword ? "\u25C9" : "\u25CE";
+    btn.title = isPassword ? "Hide password" : "Show password";
+  });
+});
+
+// ===== Saved Routines Sort =====
+let savedSortMode = "newest";
+
+document.querySelectorAll(".sort-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".sort-btn").forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    savedSortMode = btn.dataset.sort;
+    renderSavedRoutines();
+  });
+});
+
+function getSortedRoutines() {
+  const sorted = [...savedRoutines];
+  switch (savedSortMode) {
+    case "oldest":
+      sorted.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+      break;
+    case "name":
+      sorted.sort((a, b) => (a.title || "").localeCompare(b.title || ""));
+      break;
+    case "progress":
+      sorted.sort((a, b) => routineProgress(b).pct - routineProgress(a).pct);
+      break;
+    default:
+      sorted.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  }
+  return sorted;
+}
+
+// ===== Drill Search & Filter =====
+let activeDrillFilters = { type: null, level: null };
+
+drillSearchInput.addEventListener("input", filterDrills);
+
+document.querySelectorAll(".filter-chip").forEach((chip) => {
+  chip.addEventListener("click", () => {
+    const filterType = chip.dataset.filterType;
+    const filterValue = chip.dataset.filterValue;
+    if (activeDrillFilters[filterType] === filterValue) {
+      activeDrillFilters[filterType] = null;
+      chip.classList.remove("active");
+    } else {
+      document.querySelectorAll(`.filter-chip[data-filter-type="${filterType}"]`).forEach((c) => c.classList.remove("active"));
+      activeDrillFilters[filterType] = filterValue;
+      chip.classList.add("active");
+    }
+    filterDrills();
+  });
+});
+
+function filterDrills() {
+  if (!drillLibraryCache) return;
+  const search = drillSearchInput.value.trim().toLowerCase();
+  const filtered = drillLibraryCache.filter((drill) => {
+    if (search && !drill.name.toLowerCase().includes(search) && !drill.description.toLowerCase().includes(search)) return false;
+    if (activeDrillFilters.type && drill.type !== activeDrillFilters.type) return false;
+    if (activeDrillFilters.level && !drill.levels.some((l) => l.toLowerCase() === activeDrillFilters.level)) return false;
+    return true;
+  });
+  drillResultCount.textContent = `${filtered.length} of ${drillLibraryCache.length} drills`;
+  renderDrillLibrary(filtered);
+}
+
+// ===== Skeleton Helpers =====
+function showSkeleton(container, type) {
+  container.innerHTML = "";
+  if (type === "drills") {
+    for (let i = 0; i < 5; i++) {
+      const card = document.createElement("div");
+      card.className = "skeleton-card skeleton";
+      card.innerHTML = '<div class="skeleton-line long skeleton"></div><div class="skeleton-line short skeleton"></div>';
+      container.appendChild(card);
+    }
+  } else if (type === "stats") {
+    const grid = document.createElement("div");
+    grid.className = "stats-grid";
+    for (let i = 0; i < 4; i++) {
+      const s = document.createElement("div");
+      s.className = "skeleton-stat skeleton";
+      grid.appendChild(s);
+    }
+    container.appendChild(grid);
+    const detail = document.createElement("div");
+    detail.className = "skeleton-card skeleton";
+    detail.style.height = "80px";
+    detail.style.marginTop = "0.8rem";
+    container.appendChild(detail);
+  } else {
+    for (let i = 0; i < 3; i++) {
+      const card = document.createElement("div");
+      card.className = "skeleton-card skeleton";
+      card.innerHTML = '<div class="skeleton-line medium skeleton"></div><div class="skeleton-line short skeleton"></div>';
+      container.appendChild(card);
+    }
+  }
+}
+
+// ===== Drill Detail Modal =====
+function openDrillModal(drill) {
+  drillModalName.textContent = drill.name;
+  drillModalDesc.textContent = drill.description;
+
+  drillModalBadges.innerHTML = "";
+  const typeBadge = document.createElement("span");
+  typeBadge.className = `modal-badge type-${drill.type}`;
+  typeBadge.textContent = drill.type;
+  drillModalBadges.appendChild(typeBadge);
+
+  drill.levels.forEach((lvl) => {
+    const b = document.createElement("span");
+    b.className = "modal-badge";
+    b.textContent = lvl;
+    drillModalBadges.appendChild(b);
+  });
+
+  drill.weaknesses.forEach((w) => {
+    const b = document.createElement("span");
+    b.className = "modal-badge";
+    b.textContent = w;
+    drillModalBadges.appendChild(b);
+  });
+
+  // Populate swap alternatives
+  if (drillLibraryCache) {
+    const alts = drillLibraryCache.filter(
+      (d) => d.id !== drill.id && d.weaknesses.some((w) => drill.weaknesses.includes(w)) && d.type === drill.type
+    ).slice(0, 4);
+    if (alts.length > 0) {
+      drillModalSwap.classList.remove("hidden");
+      drillModalAlternatives.innerHTML = "";
+      alts.forEach((alt) => {
+        const btn = document.createElement("button");
+        btn.className = "modal-alt-btn";
+        btn.textContent = `${alt.name} (${alt.levels.join(", ")})`;
+        btn.addEventListener("click", () => openDrillModal(alt));
+        drillModalAlternatives.appendChild(btn);
+      });
+    } else {
+      drillModalSwap.classList.add("hidden");
+    }
+  } else {
+    drillModalSwap.classList.add("hidden");
+  }
+
+  drillModal.classList.remove("hidden");
+}
+
+function closeDrillModal() {
+  drillModal.classList.add("hidden");
+}
+
+drillModalClose.addEventListener("click", closeDrillModal);
+drillModal.addEventListener("click", (e) => {
+  if (e.target === drillModal) closeDrillModal();
+});
+
+// ===== Reflection Modal =====
+let reflectionRating = 0;
+let reflectionSelectedTags = new Set();
+
+reflectionStars.addEventListener("click", (e) => {
+  const star = e.target.closest(".star");
+  if (!star) return;
+  reflectionRating = Number(star.dataset.val);
+  reflectionStars.querySelectorAll(".star").forEach((s) => {
+    s.classList.toggle("active", Number(s.dataset.val) <= reflectionRating);
+  });
+});
+
+reflectionTags.addEventListener("click", (e) => {
+  const btn = e.target.closest(".tag-btn");
+  if (!btn) return;
+  const tag = btn.dataset.tag;
+  if (reflectionSelectedTags.has(tag)) {
+    reflectionSelectedTags.delete(tag);
+    btn.classList.remove("selected");
+  } else {
+    reflectionSelectedTags.add(tag);
+    btn.classList.add("selected");
+  }
+});
+
+function openReflectionModal(routineId, key) {
+  reflectionRating = 0;
+  reflectionSelectedTags.clear();
+  reflectionNote.value = "";
+  reflectionStars.querySelectorAll(".star").forEach((s) => s.classList.remove("active"));
+  reflectionTags.querySelectorAll(".tag-btn").forEach((b) => b.classList.remove("selected"));
+  pendingReflection = { routineId, key };
+  reflectionModal.classList.remove("hidden");
+}
+
+function closeReflectionModal() {
+  reflectionModal.classList.add("hidden");
+  pendingReflection = null;
+}
+
+reflectionModalClose.addEventListener("click", closeReflectionModal);
+reflectionModal.addEventListener("click", (e) => {
+  if (e.target === reflectionModal) closeReflectionModal();
+});
+
+reflectionSkipBtn.addEventListener("click", closeReflectionModal);
+
+reflectionSaveBtn.addEventListener("click", async () => {
+  if (!pendingReflection) return;
+  const { routineId, key } = pendingReflection;
+  const reflection = {
+    rating: reflectionRating,
+    note: reflectionNote.value.trim(),
+    tags: Array.from(reflectionSelectedTags),
+    date: new Date().toISOString()
+  };
+
+  try {
+    await api(`/api/routines/${routineId}`, {
+      method: "PUT",
+      body: JSON.stringify({ reflections: { [key]: reflection } })
+    });
+
+    const idx = savedRoutines.findIndex((r) => r.id === routineId);
+    if (idx !== -1) {
+      if (!savedRoutines[idx].reflections) savedRoutines[idx].reflections = {};
+      savedRoutines[idx].reflections[key] = reflection;
+    }
+    if (currentRoutine?.id === routineId) {
+      if (!currentRoutine.reflections) currentRoutine.reflections = {};
+      currentRoutine.reflections[key] = reflection;
+    }
+    showToast("Reflection saved.");
+  } catch (err) {
+    setMessage(err.message, true);
+  }
+  closeReflectionModal();
+});
+
+// ===== Drag and Drop =====
+let dragSrcEl = null;
+let dragSrcContainer = null;
+
+function initDragDrop(container, onReorder) {
+  const items = container.querySelectorAll("[data-drag-idx]");
+  items.forEach((item) => {
+    item.setAttribute("draggable", "true");
+
+    item.addEventListener("dragstart", (e) => {
+      dragSrcEl = item;
+      dragSrcContainer = container;
+      item.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", item.dataset.dragIdx);
+    });
+
+    item.addEventListener("dragend", () => {
+      item.classList.remove("dragging");
+      container.querySelectorAll("[data-drag-idx]").forEach((el) => el.classList.remove("drag-over"));
+      dragSrcEl = null;
+      dragSrcContainer = null;
+    });
+
+    item.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      if (dragSrcEl !== item && dragSrcContainer === container) {
+        container.querySelectorAll("[data-drag-idx]").forEach((el) => el.classList.remove("drag-over"));
+        item.classList.add("drag-over");
+      }
+    });
+
+    item.addEventListener("dragleave", () => {
+      item.classList.remove("drag-over");
+    });
+
+    item.addEventListener("drop", (e) => {
+      e.preventDefault();
+      item.classList.remove("drag-over");
+      if (dragSrcEl && dragSrcEl !== item && dragSrcContainer === container) {
+        const fromIdx = Number(dragSrcEl.dataset.dragIdx);
+        const toIdx = Number(item.dataset.dragIdx);
+        onReorder(fromIdx, toIdx);
+      }
+    });
+  });
+}
 
 function profileCacheKey(userId) {
   return `thegolfbuild_profile_${userId}`;
@@ -192,33 +592,42 @@ function getDisplayFirstName() {
 function setPlanMode(mode) {
   activePlanMode = mode;
   const planPanel = document.querySelector(".plan-panel");
+  const profilePanel = document.querySelector(".profile-panel");
 
   generatedRoutineView.classList.add("hidden");
   customRoutineView.classList.add("hidden");
   drillLibraryPanel.classList.add("hidden");
   statsPanel.classList.add("hidden");
-  planPanel.classList.remove("hidden");
+  savedPanel.classList.add("hidden");
+  planPanel.classList.add("hidden");
+  profilePanel.classList.add("hidden");
 
   showGeneratedRoutineBtn.classList.remove("active");
   showCustomRoutineBtn.classList.remove("active");
   showDrillLibraryBtn.classList.remove("active");
   showStatsBtn.classList.remove("active");
+  showSavedBtn.classList.remove("active");
 
   if (mode === "custom") {
+    planPanel.classList.remove("hidden");
+    profilePanel.classList.remove("hidden");
     customRoutineView.classList.remove("hidden");
     showCustomRoutineBtn.classList.add("active");
     planPanelTitle.textContent = "Custom Practice Routine";
   } else if (mode === "drills") {
-    planPanel.classList.add("hidden");
     drillLibraryPanel.classList.remove("hidden");
     showDrillLibraryBtn.classList.add("active");
     loadDrillLibrary();
   } else if (mode === "stats") {
-    planPanel.classList.add("hidden");
     statsPanel.classList.remove("hidden");
     showStatsBtn.classList.add("active");
     loadStats();
+  } else if (mode === "saved") {
+    savedPanel.classList.remove("hidden");
+    showSavedBtn.classList.add("active");
   } else {
+    planPanel.classList.remove("hidden");
+    profilePanel.classList.remove("hidden");
     generatedRoutineView.classList.remove("hidden");
     showGeneratedRoutineBtn.classList.add("active");
     planPanelTitle.textContent = "Generated Practice Routine";
@@ -258,6 +667,7 @@ function lockPlanner(locked) {
   loadDemoBtn.disabled = locked;
   showGeneratedRoutineBtn.disabled = locked;
   showCustomRoutineBtn.disabled = locked;
+  showSavedBtn.disabled = locked;
   upgradeBtn.disabled = locked;
 
   if (locked) {
@@ -419,9 +829,22 @@ function renderRoutine(routine) {
     const block = document.createElement("section");
     block.className = "week-block";
 
+    const weekHeader = document.createElement("div");
+    weekHeader.className = "week-header";
     const heading = document.createElement("h3");
     heading.textContent = week.headline;
-    block.appendChild(heading);
+    const toggleBtn = document.createElement("button");
+    toggleBtn.className = "week-toggle";
+    toggleBtn.type = "button";
+    toggleBtn.textContent = "\u25BC";
+    toggleBtn.title = "Collapse/expand week";
+    weekHeader.appendChild(heading);
+    weekHeader.appendChild(toggleBtn);
+    weekHeader.addEventListener("click", () => block.classList.toggle("collapsed"));
+    block.appendChild(weekHeader);
+
+    const sessionsContainer = document.createElement("div");
+    sessionsContainer.className = "week-sessions";
 
     let weekDone = 0;
     const weekTotal = (week.sessions || []).length;
@@ -433,12 +856,19 @@ function renderRoutine(routine) {
 
       const card = document.createElement("div");
       card.className = "session-card" + (done ? " completed" : "");
+      if (isSaved) card.setAttribute("data-drag-idx", si);
 
-      // Header with checkbox and title
+      // Header with drag handle, checkbox, and title
       const header = document.createElement("div");
       header.className = "session-card-header";
 
       if (isSaved) {
+        const handle = document.createElement("span");
+        handle.className = "drag-handle";
+        handle.textContent = "\u2261";
+        handle.title = "Drag to reorder";
+        header.appendChild(handle);
+
         const cb = document.createElement("input");
         cb.type = "checkbox";
         cb.checked = done;
@@ -454,6 +884,17 @@ function renderRoutine(routine) {
       titleLabel.textContent = session.title;
       titleWrap.appendChild(titleLabel);
       header.appendChild(titleWrap);
+
+      // Reflection badge
+      const reflections = routine.reflections || {};
+      const ref = reflections[key];
+      if (ref && ref.rating > 0) {
+        const badge = document.createElement("span");
+        badge.className = "session-reflection-badge";
+        badge.innerHTML = `<span class="badge-stars">${"\u2605".repeat(ref.rating)}</span>`;
+        header.appendChild(badge);
+      }
+
       card.appendChild(header);
 
       // Body with structured drill blocks
@@ -474,16 +915,43 @@ function renderRoutine(routine) {
 
         const text = document.createElement("span");
         text.className = "drill-text";
-        // Strip the duration prefix for cleaner display
-        text.textContent = bullet.replace(/^\d+\s*min\s*/, "");
+        const bulletText = bullet.replace(/^\d+\s*min\s*/, "");
+        // Try to find drill name in the bullet and make it clickable
+        const drillMatch = drillLibraryCache ? drillLibraryCache.find((d) => bulletText.includes(d.name)) : null;
+        if (drillMatch) {
+          const parts = bulletText.split(drillMatch.name);
+          if (parts[0]) text.appendChild(document.createTextNode(parts[0]));
+          const link = document.createElement("a");
+          link.className = "drill-link";
+          link.textContent = drillMatch.name;
+          link.href = "#";
+          link.addEventListener("click", (e) => { e.preventDefault(); openDrillModal(drillMatch); });
+          text.appendChild(link);
+          if (parts[1]) text.appendChild(document.createTextNode(parts[1]));
+        } else {
+          text.textContent = bulletText;
+        }
         drillBlock.appendChild(text);
 
         body.appendChild(drillBlock);
       });
 
       card.appendChild(body);
-      block.appendChild(card);
+
+      // Reflection note below session card body
+      const reflections2 = routine.reflections || {};
+      const ref2 = reflections2[key];
+      if (ref2 && ref2.note) {
+        const noteEl = document.createElement("div");
+        noteEl.className = "session-reflection-note";
+        noteEl.textContent = ref2.note;
+        card.appendChild(noteEl);
+      }
+
+      sessionsContainer.appendChild(card);
     });
+
+    block.appendChild(sessionsContainer);
 
     if (isSaved && weekTotal > 0) {
       const pct = Math.round((weekDone / weekTotal) * 100);
@@ -492,6 +960,22 @@ function renderRoutine(routine) {
       prog.innerHTML = `<div class="progress-bar-wrap"><div class="progress-bar" style="width:${pct}%"></div></div>` +
         `<p class="week-progress-text">${weekDone}/${weekTotal} sessions complete</p>`;
       block.appendChild(prog);
+
+      // Init drag-drop for session reordering
+      initDragDrop(sessionsContainer, async (fromIdx, toIdx) => {
+        const sessions = routine.weeks[wi].sessions;
+        const [moved] = sessions.splice(fromIdx, 1);
+        sessions.splice(toIdx, 0, moved);
+        renderRoutine(routine);
+        if (routine.id) {
+          try {
+            await api(`/api/routines/${routine.id}`, {
+              method: "PUT",
+              body: JSON.stringify({ weeks: routine.weeks })
+            });
+          } catch (_err) { /* silent */ }
+        }
+      });
     }
 
     routineWeeks.appendChild(block);
@@ -505,6 +989,10 @@ function renderRoutine(routine) {
 
 async function toggleCompletion(routineId, key, weekIndex, weekTotal) {
   try {
+    // Check if we're completing (not uncompleting)
+    const routine = savedRoutines.find((r) => r.id === routineId) || currentRoutine;
+    const wasCompleted = routine?.completions?.[key];
+
     const result = await api(`/api/routines/${routineId}/complete`, {
       method: "POST",
       body: JSON.stringify({ key })
@@ -517,6 +1005,11 @@ async function toggleCompletion(routineId, key, weekIndex, weekTotal) {
       renderRoutine(currentRoutine);
     }
     renderSavedRoutines();
+
+    // Show reflection modal when completing (not uncompleting)
+    if (!wasCompleted && updated.completions?.[key]) {
+      openReflectionModal(routineId, key);
+    }
 
     // Check if entire week is now complete for confetti
     if (weekIndex !== undefined && weekTotal) {
@@ -571,7 +1064,7 @@ function renderSavedRoutines() {
   savedEmptyState.classList.toggle("hidden", savedRoutines.length > 0);
   renderUsage();
 
-  savedRoutines.forEach((routine) => {
+  getSortedRoutines().forEach((routine) => {
     const node = savedRoutineTemplate.content.cloneNode(true);
     const wrapper = node.querySelector(".saved-item");
 
@@ -589,19 +1082,21 @@ function renderSavedRoutines() {
       setPlanMode("generated");
     });
 
-    wrapper.querySelector(".delete-btn").addEventListener("click", async () => {
-      try {
-        await api(`/api/routines/${routine.id}`, { method: "DELETE" });
-        savedRoutines = savedRoutines.filter((item) => item.id !== routine.id);
-        renderSavedRoutines();
+    wrapper.querySelector(".delete-btn").addEventListener("click", () => {
+      openConfirmModal("Delete Routine", `Are you sure you want to delete "${routine.title}"? This cannot be undone.`, async () => {
+        try {
+          await api(`/api/routines/${routine.id}`, { method: "DELETE" });
+          savedRoutines = savedRoutines.filter((item) => item.id !== routine.id);
+          renderSavedRoutines();
 
-        if (currentRoutine?.id === routine.id) {
-          currentRoutine = null;
-          renderRoutine(null);
+          if (currentRoutine?.id === routine.id) {
+            currentRoutine = null;
+            renderRoutine(null);
+          }
+        } catch (err) {
+          setMessage(err.message, true);
         }
-      } catch (err) {
-        setMessage(err.message, true);
-      }
+      });
     });
 
     savedList.appendChild(node);
@@ -624,13 +1119,13 @@ function updateAuthUi() {
   authStatus.textContent = isAuthed ? `Signed in as ${currentUser.name}` : "Not signed in";
   setAuthMode(isAuthed ? false : isRegisterMode);
   authPanel.classList.toggle("hidden", isAuthed);
-  welcomePanel.classList.toggle("hidden", !isAuthed);
+  userMenuWrap.classList.toggle("hidden", !isAuthed);
   loadDemoBtn.classList.toggle("hidden", isAuthed);
   if (isAuthed) {
-    welcomeName.textContent = "";
-    welcomeMessage.textContent = `Let's get better today ${getDisplayFirstName()}`;
+    userMenuName.textContent = getDisplayFirstName();
+    welcomeMessage.textContent = `Let's get better today, ${getDisplayFirstName()}`;
   } else {
-    welcomeName.textContent = "";
+    userMenuName.textContent = "";
     welcomeMessage.textContent = "";
   }
   lockPlanner(!isAuthed);
@@ -824,6 +1319,11 @@ showGeneratedRoutineBtn.addEventListener("click", () => setPlanMode("generated")
 showCustomRoutineBtn.addEventListener("click", () => setPlanMode("custom"));
 showDrillLibraryBtn.addEventListener("click", () => setPlanMode("drills"));
 showStatsBtn.addEventListener("click", () => setPlanMode("stats"));
+showSavedBtn.addEventListener("click", () => setPlanMode("saved"));
+
+document.getElementById("loadDemoBtnInline").addEventListener("click", () => {
+  loadDemoBtn.click();
+});
 authForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (currentUser) return;
@@ -915,23 +1415,25 @@ saveRoutineBtn.addEventListener("click", async () => {
   }
 });
 
-clearProfileBtn.addEventListener("click", async () => {
+clearProfileBtn.addEventListener("click", () => {
   if (!currentUser) return;
 
-  hydrateForm({ name: currentUser.name });
-  currentRoutine = null;
-  renderRoutine(null);
+  openConfirmModal("Clear Profile", "Are you sure you want to clear your profile? Your saved routines will not be affected.", async () => {
+    hydrateForm({ name: currentUser.name });
+    currentRoutine = null;
+    renderRoutine(null);
 
-  try {
-    await api("/api/profile", {
-      method: "PUT",
-      body: JSON.stringify({ profile: null })
-    });
-    clearCachedProfile(currentUser?.id);
-    setMessage("Profile inputs cleared.");
-  } catch (err) {
-    setMessage(err.message, true);
-  }
+    try {
+      await api("/api/profile", {
+        method: "PUT",
+        body: JSON.stringify({ profile: null })
+      });
+      clearCachedProfile(currentUser?.id);
+      setMessage("Profile inputs cleared.");
+    } catch (err) {
+      setMessage(err.message, true);
+    }
+  });
 });
 
 loadDemoBtn.addEventListener("click", () => {
@@ -957,6 +1459,7 @@ async function loadDrillLibrary() {
     renderDrillLibrary(drillLibraryCache);
     return;
   }
+  showSkeleton(drillLibraryContent, "drills");
   try {
     const result = await api("/api/drills");
     drillLibraryCache = result.drills;
@@ -993,11 +1496,24 @@ function renderDrillLibrary(drills) {
 
     for (const drill of list) {
       const li = document.createElement("li");
-      li.className = "drill-item";
+      li.className = "drill-item drag-source";
+      li.setAttribute("draggable", "true");
+      li.dataset.drillId = drill.id;
       li.innerHTML = `<p class="drill-item-name">${drill.name}</p>` +
         `<p class="drill-item-tags">${drill.type} • ${drill.levels.join(", ")}</p>` +
         `<p class="drill-item-desc">${drill.description}</p>`;
-      li.addEventListener("click", () => li.classList.toggle("expanded"));
+      li.addEventListener("click", (e) => {
+        if (e.target.closest(".drill-item-name")) {
+          openDrillModal(drill);
+        } else {
+          li.classList.toggle("expanded");
+        }
+      });
+      li.addEventListener("dragstart", (e) => {
+        e.dataTransfer.setData("text/plain", drill.name);
+        e.dataTransfer.setData("application/x-drill", JSON.stringify(drill));
+        e.dataTransfer.effectAllowed = "copy";
+      });
       ul.appendChild(li);
     }
 
@@ -1019,11 +1535,24 @@ function renderDrillLibrary(drills) {
     ul.className = "drill-category-list";
     for (const drill of general) {
       const li = document.createElement("li");
-      li.className = "drill-item";
+      li.className = "drill-item drag-source";
+      li.setAttribute("draggable", "true");
+      li.dataset.drillId = drill.id;
       li.innerHTML = `<p class="drill-item-name">${drill.name}</p>` +
         `<p class="drill-item-tags">${drill.type} • ${drill.levels.join(", ")}</p>` +
         `<p class="drill-item-desc">${drill.description}</p>`;
-      li.addEventListener("click", () => li.classList.toggle("expanded"));
+      li.addEventListener("click", (e) => {
+        if (e.target.closest(".drill-item-name")) {
+          openDrillModal(drill);
+        } else {
+          li.classList.toggle("expanded");
+        }
+      });
+      li.addEventListener("dragstart", (e) => {
+        e.dataTransfer.setData("text/plain", drill.name);
+        e.dataTransfer.setData("application/x-drill", JSON.stringify(drill));
+        e.dataTransfer.effectAllowed = "copy";
+      });
       ul.appendChild(li);
     }
     cat.appendChild(header);
@@ -1038,9 +1567,23 @@ async function loadStats() {
     document.getElementById("statsContent").innerHTML = '<p class="empty-state">Sign in to view your stats.</p>';
     return;
   }
+  const statsContent = document.getElementById("statsContent");
+  showSkeleton(statsContent, "stats");
   try {
     const result = await api("/api/stats");
+    // Restore stats HTML structure before rendering
+    statsContent.innerHTML = `
+      <div class="stats-grid">
+        <div class="stat-card"><p class="stat-value" id="statRoutines">-</p><p class="stat-label">Routines Saved</p></div>
+        <div class="stat-card"><p class="stat-value" id="statCompleted">-</p><p class="stat-label">Sessions Completed</p></div>
+        <div class="stat-card"><p class="stat-value" id="statStreak">-</p><p class="stat-label">Current Streak</p></div>
+        <div class="stat-card"><p class="stat-value" id="statLongest">-</p><p class="stat-label">Longest Streak</p></div>
+      </div>
+      <div class="stats-detail"><h3>Session Progress</h3><div class="progress-bar-wrap"><div id="statProgressBar" class="progress-bar" style="width:0%"></div></div><p id="statProgressText" class="stat-progress-text">0 / 0 sessions</p></div>
+      <div class="stats-detail"><h3>Weakness Coverage</h3><div id="statWeakness" class="weakness-chart"></div></div>
+    `;
     renderStats(result.stats);
+    renderEnhancedStats(result.stats);
   } catch (err) {
     setMessage(err.message, true);
   }
@@ -1072,6 +1615,112 @@ function renderStats(stats) {
       `<span class="bar-count">${count}</span>`;
     weaknessEl.appendChild(row);
   }
+}
+
+function renderEnhancedStats(stats) {
+  const statsContent = document.getElementById("statsContent");
+
+  // Streak Context
+  const streak = stats.currentStreak || 0;
+  let streakMsg = "Start practicing to build a streak!";
+  if (streak >= 14) streakMsg = `${streak} day streak - unstoppable!`;
+  else if (streak >= 7) streakMsg = `${streak} day streak - incredible consistency!`;
+  else if (streak >= 5) streakMsg = `${streak} day streak - you're on fire!`;
+  else if (streak >= 3) streakMsg = `${streak} day streak - building momentum!`;
+  else if (streak >= 1) streakMsg = `${streak} day streak - keep it going!`;
+
+  const streakEl = document.createElement("div");
+  streakEl.className = "streak-context";
+  streakEl.innerHTML = `<p class="streak-label">${streakMsg}</p>`;
+  statsContent.appendChild(streakEl);
+
+  // Average Reflection Rating
+  const allReflections = [];
+  for (const routine of savedRoutines) {
+    if (routine.reflections) {
+      for (const key of Object.keys(routine.reflections)) {
+        allReflections.push(routine.reflections[key]);
+      }
+    }
+  }
+
+  const ratingsWithValue = allReflections.filter((r) => r.rating > 0);
+  const avgRating = ratingsWithValue.length > 0
+    ? ratingsWithValue.reduce((sum, r) => sum + r.rating, 0) / ratingsWithValue.length
+    : 0;
+
+  const avgSection = document.createElement("div");
+  avgSection.className = "avg-rating-section";
+  const fullStars = Math.floor(avgRating);
+  const hasHalf = avgRating - fullStars >= 0.5;
+  let starStr = "\u2605".repeat(fullStars) + (hasHalf ? "\u00BD" : "") + "\u2606".repeat(5 - fullStars - (hasHalf ? 1 : 0));
+  avgSection.innerHTML = `<h3>Average Reflection Rating</h3>` +
+    `<div class="avg-rating-display">` +
+    `<span class="avg-rating-stars">${starStr}</span>` +
+    `<span class="avg-rating-value">${avgRating > 0 ? avgRating.toFixed(1) : "-"} / 5</span>` +
+    `<span style="color:var(--muted);font-size:0.82rem">(${ratingsWithValue.length} reflections)</span>` +
+    `</div>`;
+  statsContent.appendChild(avgSection);
+
+  // Practice Log - last 10 reflections
+  if (allReflections.length > 0) {
+    const sorted = [...allReflections].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 10);
+    const logEl = document.createElement("div");
+    logEl.className = "practice-log";
+    let logHtml = "<h3>Practice Log</h3><div class='practice-log-list'>";
+    for (const ref of sorted) {
+      const date = new Date(ref.date).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+      const stars = "\u2605".repeat(ref.rating || 0) + "\u2606".repeat(5 - (ref.rating || 0));
+      const tags = (ref.tags || []).map((t) => `<span class="practice-log-tag">${t}</span>`).join("");
+      logHtml += `<div class="practice-log-entry">` +
+        `<span class="practice-log-date">${date}</span>` +
+        `<span class="practice-log-stars">${stars}</span>` +
+        `<div class="practice-log-tags">${tags}</div>` +
+        `<span class="practice-log-note">${ref.note || ""}</span>` +
+        `</div>`;
+    }
+    logHtml += "</div>";
+    logEl.innerHTML = logHtml;
+    statsContent.appendChild(logEl);
+  }
+
+  // Calendar Heatmap - current month
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDayOfWeek = new Date(year, month, 1).getDay();
+
+  const activityDays = new Set();
+  for (const ref of allReflections) {
+    const d = new Date(ref.date);
+    if (d.getFullYear() === year && d.getMonth() === month) {
+      activityDays.add(d.getDate());
+    }
+  }
+
+  const calEl = document.createElement("div");
+  calEl.className = "calendar-heatmap";
+  const monthName = now.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  let calHtml = `<h3>${monthName}</h3><div class="cal-grid">`;
+  const dayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  for (const label of dayLabels) {
+    calHtml += `<div class="cal-day-label">${label}</div>`;
+  }
+  for (let i = 0; i < firstDayOfWeek; i++) {
+    calHtml += `<div class="cal-day empty"></div>`;
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    const isToday = d === now.getDate();
+    const hasActivity = activityDays.has(d);
+    const cls = ["cal-day"];
+    if (isToday) cls.push("today");
+    if (hasActivity) cls.push("has-activity");
+    calHtml += `<div class="${cls.join(" ")}">${d}</div>`;
+  }
+  calHtml += "</div>";
+  calEl.innerHTML = calHtml;
+  statsContent.appendChild(calEl);
 }
 
 // PDF Export

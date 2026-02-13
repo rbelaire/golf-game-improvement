@@ -28,9 +28,9 @@ data/
   db.json              Local dev database (JSON file)
 tests/
   api.test.js          API test suite (node:test, 43 tests)
-index.html             SPA frontend
-app.js                 Frontend logic
-styles.css             Styling
+index.html             SPA frontend (5-tab layout: Routine, Custom, Drills, Stats, Saved)
+app.js                 Frontend logic (modals, filters, sorting, reflections, stats)
+styles.css             Styling (dark/light themes, responsive, mobile bottom nav)
 sw.js                  Service worker (PWA offline support)
 manifest.webmanifest   PWA manifest
 ```
@@ -38,13 +38,25 @@ manifest.webmanifest   PWA manifest
 ## Features
 
 ### Practice Session Tracking
-Mark individual sessions complete within any saved routine. Each week shows a progress bar tracking how many sessions you've finished. Completion state syncs to the server and persists across devices.
+Mark individual sessions complete within any saved routine. Each week shows a progress bar tracking how many sessions you've finished. Weeks are collapsible — click the header to expand/collapse. Completion state syncs to the server and persists across devices.
+
+### Session Reflections
+After completing a session, a reflection modal prompts you to rate it (1-5 stars), add tags (Helpful, Too Easy, Too Hard, Great Drills), and write a quick note. Reflection stars and notes display directly on the session card in the routine view as a visual badge, so you can see feedback at a glance without navigating away.
 
 ### Drill Library Browser
-Browse all 60 drills grouped by weakness category (Driving accuracy, Approach consistency, Short game touch, Putting confidence, Course management, plus cross-cutting Foundation drills). Click any drill to expand its full description, see its type (warmup/technical/pressure/transfer), and which skill levels it targets.
+Browse all 60 drills grouped by weakness category (Driving accuracy, Approach consistency, Short game touch, Putting confidence, Course management, plus cross-cutting Foundation drills). Click any drill to expand its full description, see its type (warmup/technical/pressure/transfer), and which skill levels it targets. Search drills by name or description, and filter by type (warmup/technical/pressure/transfer) and level (beginner/intermediate/advanced) using filter chips.
 
 ### Performance Dashboard
-View your stats at a glance: routines saved, sessions completed, current streak, and longest streak. A session progress bar shows overall completion percentage, and a weakness coverage chart shows how your practice time is distributed across categories.
+View your stats at a glance: routines saved, sessions completed, current streak, and longest streak. A motivational streak label adapts to your progress. The dashboard also shows average reflection rating with star display, a practice log of your last 10 reflections (date, stars, tags, notes), and a calendar heatmap highlighting practice days in the current month.
+
+### Saved Routines
+Saved routines live on their own dedicated tab. Sort by newest, oldest, name, or completion progress. Delete actions require confirmation via a modal dialog to prevent accidental data loss.
+
+### User Menu
+A compact avatar dropdown in the header provides quick access to Change Password and Logout. The dropdown closes on outside click and supports Escape key dismissal.
+
+### Keyboard & Accessibility
+All modals (drill detail, reflection, confirm, onboarding) close with the Escape key. Password fields include a show/hide toggle button for visibility.
 
 ### Routine Export (PDF & iCal)
 Export any routine to PDF for printing (opens a print-friendly view) or download as an `.ics` calendar file that adds each session to your phone calendar with drill details and proper time blocks.
@@ -129,6 +141,24 @@ Falls back to `data/db.json`. On Vercel without Postgres, writes go to `/tmp/gol
 | GET | `/api/admin/users` | Super | List all users |
 | POST | `/api/admin/users/promote` | Super | Promote user to super |
 | PUT | `/api/admin/users/:id` | Super | Update user plan/role |
+
+## Frontend UI/UX
+
+The SPA uses a 5-tab navigation (Routine, Custom, Drills, Stats, Saved) that becomes a fixed bottom nav bar on mobile. Key UI patterns:
+
+- **Confirm modal** — Destructive actions (delete routine, clear profile) go through a reusable confirm dialog (`openConfirmModal(title, message, onConfirm)`)
+- **User menu dropdown** — Compact avatar button in the header with a positioned dropdown (greeting, change password, logout). Closes on outside click
+- **Drill search & filter** — Text search + filter chips for drill type and skill level. Result count updates live
+- **Collapsible weeks** — Click any week header to collapse/expand its session cards
+- **Reflection badges** — Star ratings and notes from session reflections display inline on the session card header
+- **Password visibility** — Show/hide toggle on all password fields
+- **Saved routine sorting** — Sort by newest, oldest, name, or completion progress
+- **Keyboard support** — Escape key closes all modals
+- **Theme toggle** — Dark/light mode with localStorage persistence
+- **Toast notifications** — Success/error toasts with auto-dismiss and manual dismiss
+- **Skeleton loading** — Shimmer placeholders while drills and stats load
+- **Drag & drop** — Reorder sessions within a week via drag handles
+- **Confetti** — Celebratory animation when completing an entire week
 
 ## Routine generation
 

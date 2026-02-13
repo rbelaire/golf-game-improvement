@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
@@ -58,25 +58,39 @@
         <h1>thegolfbuild</h1>
       </div>
       <div class="topbar-right">
+        <button id="themeToggleBtn" class="btn btn-outline theme-toggle-btn" type="button" title="Toggle light/dark theme">
+          <span id="themeIcon">&#9788;</span>
+        </button>
         <button id="loadDemoBtn" class="btn btn-outline" type="button">Load Demo Data</button>
-        <div id="welcomePanel" class="welcome-panel hidden">
-          <p id="welcomeName" class="welcome-name"></p>
-          <p id="welcomeMessage" class="welcome-message"></p>
-          <button id="topLogoutBtn" class="btn btn-danger" type="button">Logout</button>
-          <button id="changePasswordBtn" class="btn btn-outline" type="button">Change Password</button>
-          <div id="changePasswordPanel" class="reset-panel hidden">
-            <label>
-              Current Password
-              <input type="password" id="currentPasswordInput" placeholder="Your current password" />
-            </label>
-            <label>
-              New Password
-              <input type="password" id="newPasswordInput" placeholder="At least 8 characters" />
-            </label>
-            <div class="cta-row">
-              <button id="submitPasswordChangeBtn" class="btn btn-primary" type="button">Update Password</button>
-              <button id="cancelPasswordChangeBtn" class="btn btn-outline" type="button">Cancel</button>
+        <div id="userMenuWrap" class="user-menu-wrap hidden">
+          <button id="userMenuBtn" class="btn btn-outline user-menu-btn" type="button" title="User menu">
+            <span id="userAvatar" class="user-avatar">&#9679;</span>
+            <span id="userMenuName" class="user-menu-name"></span>
+          </button>
+          <div id="userMenuDropdown" class="user-menu-dropdown hidden">
+            <p id="welcomeMessage" class="user-menu-greeting"></p>
+            <button id="changePasswordBtn" class="btn btn-outline user-menu-item" type="button">Change Password</button>
+            <div id="changePasswordPanel" class="reset-panel hidden">
+              <label>
+                Current Password
+                <div class="password-field-wrap">
+                  <input type="password" id="currentPasswordInput" placeholder="Your current password" />
+                  <button type="button" class="password-toggle" data-target="currentPasswordInput" title="Show password">&#9673;</button>
+                </div>
+              </label>
+              <label>
+                New Password
+                <div class="password-field-wrap">
+                  <input type="password" id="newPasswordInput" placeholder="At least 8 characters" />
+                  <button type="button" class="password-toggle" data-target="newPasswordInput" title="Show password">&#9673;</button>
+                </div>
+              </label>
+              <div class="cta-row">
+                <button id="submitPasswordChangeBtn" class="btn btn-primary" type="button">Update Password</button>
+                <button id="cancelPasswordChangeBtn" class="btn btn-outline" type="button">Cancel</button>
+              </div>
             </div>
+            <button id="topLogoutBtn" class="btn btn-danger user-menu-item" type="button">Logout</button>
           </div>
         </div>
       </div>
@@ -94,6 +108,9 @@
       </button>
       <button id="showStatsBtn" class="tab-btn" type="button">
         <span class="tab-icon">&#9670;</span><span class="tab-label">Stats</span>
+      </button>
+      <button id="showSavedBtn" class="tab-btn" type="button">
+        <span class="tab-icon">&#9733;</span><span class="tab-label">Saved</span>
       </button>
     </nav>
 
@@ -115,7 +132,10 @@
           </label>
           <label>
             Password
+            <div class="password-field-wrap">
               <input type="password" id="accountPassword" placeholder="At least 8 characters" required />
+              <button type="button" class="password-toggle" data-target="accountPassword" title="Show password">&#9673;</button>
+            </div>
           </label>
           <div class="cta-row">
             <button id="registerBtn" class="btn btn-primary hidden" type="button">Create Account</button>
@@ -190,6 +210,9 @@
           </div>
           <div id="routineEmptyState" class="empty-state">
             Sign in, then fill out your profile to generate a training routine.
+            <div class="empty-state-actions">
+              <button id="loadDemoBtnInline" class="btn btn-outline" type="button">Load Demo Data</button>
+            </div>
           </div>
           <article id="routineCard" class="routine-card hidden">
             <div class="routine-header">
@@ -239,6 +262,25 @@
       <section id="drillLibraryPanel" class="panel drill-library-panel hidden">
         <h2>Drill Library</h2>
         <p class="plan-mode-note">Browse all 60 drills grouped by weakness category. Click any drill to expand its description.</p>
+        <div class="drill-search-bar">
+          <input type="text" id="drillSearchInput" placeholder="Search drills..." />
+          <p id="drillResultCount" class="drill-result-count"></p>
+        </div>
+        <div class="drill-filter-row">
+          <div class="drill-filter-group">
+            <span class="drill-filter-label">Type:</span>
+            <button class="filter-chip" data-filter-type="type" data-filter-value="warmup" type="button">Warmup</button>
+            <button class="filter-chip" data-filter-type="type" data-filter-value="technical" type="button">Technical</button>
+            <button class="filter-chip" data-filter-type="type" data-filter-value="pressure" type="button">Pressure</button>
+            <button class="filter-chip" data-filter-type="type" data-filter-value="transfer" type="button">Transfer</button>
+          </div>
+          <div class="drill-filter-group">
+            <span class="drill-filter-label">Level:</span>
+            <button class="filter-chip" data-filter-type="level" data-filter-value="beginner" type="button">Beginner</button>
+            <button class="filter-chip" data-filter-type="level" data-filter-value="intermediate" type="button">Intermediate</button>
+            <button class="filter-chip" data-filter-type="level" data-filter-value="advanced" type="button">Advanced</button>
+          </div>
+        </div>
         <div id="drillLibraryContent" class="drill-library-content"></div>
       </section>
 
@@ -277,11 +319,18 @@
         </div>
       </section>
 
-      <section class="panel saved-panel">
+      <section class="panel saved-panel hidden">
         <h2>Saved Routines</h2>
         <div class="usage-row">
           <p id="usageText" class="usage-text"></p>
           <button id="upgradeBtn" class="btn btn-primary" type="button">Upgrade to Pro</button>
+        </div>
+        <div class="sort-controls">
+          <span class="sort-label">Sort:</span>
+          <button class="sort-btn active" data-sort="newest" type="button">Newest</button>
+          <button class="sort-btn" data-sort="oldest" type="button">Oldest</button>
+          <button class="sort-btn" data-sort="name" type="button">Name</button>
+          <button class="sort-btn" data-sort="progress" type="button">Progress</button>
         </div>
         <div id="savedEmptyState" class="empty-state">No routines saved yet.</div>
         <div id="savedList" class="saved-list"></div>
@@ -304,6 +353,60 @@
         </div>
       </article>
     </template>
+
+    <!-- Drill Detail Modal -->
+    <div id="drillModal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+      <div class="modal-card">
+        <button id="drillModalClose" class="modal-close" type="button">&times;</button>
+        <h3 id="drillModalName"></h3>
+        <div id="drillModalBadges" class="modal-badges"></div>
+        <p id="drillModalDesc" class="modal-desc"></p>
+        <div id="drillModalSwap" class="modal-swap hidden">
+          <h4>Swap with</h4>
+          <div id="drillModalAlternatives" class="modal-alternatives"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Session Reflection Modal -->
+    <div id="reflectionModal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+      <div class="modal-card">
+        <button id="reflectionModalClose" class="modal-close" type="button">&times;</button>
+        <h3>Session Reflection</h3>
+        <p class="modal-desc">How did this session go?</p>
+        <div class="reflection-stars" id="reflectionStars">
+          <span class="star" data-val="1">&#9733;</span>
+          <span class="star" data-val="2">&#9733;</span>
+          <span class="star" data-val="3">&#9733;</span>
+          <span class="star" data-val="4">&#9733;</span>
+          <span class="star" data-val="5">&#9733;</span>
+        </div>
+        <input type="text" id="reflectionNote" placeholder="Quick note (optional)" maxlength="120" />
+        <div class="reflection-tags" id="reflectionTags">
+          <button type="button" class="tag-btn" data-tag="Helpful">Helpful</button>
+          <button type="button" class="tag-btn" data-tag="Too Easy">Too Easy</button>
+          <button type="button" class="tag-btn" data-tag="Too Hard">Too Hard</button>
+          <button type="button" class="tag-btn" data-tag="Great Drills">Great Drills</button>
+        </div>
+        <div class="cta-row" style="margin-top:0.8rem">
+          <button id="reflectionSaveBtn" class="btn btn-primary" type="button">Save Reflection</button>
+          <button id="reflectionSkipBtn" class="btn btn-outline" type="button">Skip</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Confirm Modal -->
+    <div id="confirmModal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+      <div class="modal-card">
+        <button id="confirmModalClose" class="modal-close" type="button">&times;</button>
+        <h3 id="confirmModalTitle">Are you sure?</h3>
+        <p id="confirmModalMessage" class="modal-desc"></p>
+        <div class="cta-row" style="margin-top:0.8rem">
+          <button id="confirmModalOk" class="btn btn-danger" type="button">Confirm</button>
+          <button id="confirmModalCancel" class="btn btn-outline" type="button">Cancel</button>
+        </div>
+      </div>
+    </div>
 
     <script src="app.js"></script>
     <script>
