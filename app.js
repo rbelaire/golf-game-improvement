@@ -505,7 +505,8 @@ profileForm.addEventListener("submit", async (event) => {
     if (generation.source === "ai") {
       setMessage("AI routine generated. Save it when ready.");
     } else {
-      setMessage("Routine generated with fallback engine. Save it when ready.");
+      const reason = generation.fallbackReason ? ` Reason: ${generation.fallbackReason}` : "";
+      setMessage(`Routine generated with fallback engine. Save it when ready.${reason}`);
     }
   } catch (err) {
     setMessage(err.message, true);

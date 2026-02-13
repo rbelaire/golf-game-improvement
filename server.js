@@ -597,21 +597,30 @@ async function handleApi(req, res, url) {
       const profile = normalizeProfile(body.profile);
       let routine = null;
       let source = "fallback";
+      let fallbackReason = "";
 
       if (OPENAI_API_KEY) {
         try {
           routine = await generateRoutineWithAi(profile);
           source = "ai";
         } catch (err) {
+          fallbackReason = err.message || "Unknown AI generation error.";
           console.error("AI routine generation failed, using fallback:", err.message);
         }
+      } else {
+        fallbackReason = "OPENAI_API_KEY is not configured on the server.";
       }
 
       if (!routine) {
         routine = buildDeterministicRoutine(profile);
       }
 
-      sendJson(res, 200, { routine, source });
+      const responsePayload = { routine, source };
+      if (source === "fallback" && isSuperUser(auth.user) && fallbackReason) {
+        responsePayload.fallbackReason = fallbackReason;
+      }
+
+      sendJson(res, 200, responsePayload);
       return;
     } catch (err) {
       sendJson(res, 400, { error: err.message });
