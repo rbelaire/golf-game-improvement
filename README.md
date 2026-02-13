@@ -20,7 +20,7 @@ npm test
 server.js              HTTP server, route handlers, auth helpers
 lib/
   db.js                Database abstraction (Postgres + JSON file fallback)
-  drills.js            DRILL_LIBRARY (30 drills with descriptions), rules engine, profile helpers
+  drills.js            DRILL_LIBRARY (60 drills with descriptions), rules engine, profile helpers
   rate-limit.js        In-memory IP-based sliding-window rate limiter
 api/
   index.js             Vercel serverless wrapper
@@ -41,7 +41,7 @@ manifest.webmanifest   PWA manifest
 Mark individual sessions complete within any saved routine. Each week shows a progress bar tracking how many sessions you've finished. Completion state syncs to the server and persists across devices.
 
 ### Drill Library Browser
-Browse all 30 drills grouped by weakness category (Driving accuracy, Approach consistency, Short game touch, Putting confidence, Course management, plus cross-cutting Foundation drills). Click any drill to expand its full description, see its type (warmup/technical/pressure/transfer), and which skill levels it targets.
+Browse all 60 drills grouped by weakness category (Driving accuracy, Approach consistency, Short game touch, Putting confidence, Course management, plus cross-cutting Foundation drills). Click any drill to expand its full description, see its type (warmup/technical/pressure/transfer), and which skill levels it targets.
 
 ### Performance Dashboard
 View your stats at a glance: routines saved, sessions completed, current streak, and longest streak. A session progress bar shows overall completion percentage, and a weakness coverage chart shows how your practice time is distributed across categories.
@@ -132,7 +132,7 @@ Falls back to `data/db.json`. On Vercel without Postgres, writes go to `/tmp/gol
 
 ## Routine generation
 
-Routines are generated entirely by the built-in rules engine (no AI provider or API key required). The drill library contains 30 drills across 5 weakness categories, scored by relevance, skill level, type preference, and recency.
+Routines are generated entirely by the built-in rules engine (no AI provider or API key required). The drill library contains 60 drills across 5 weakness categories, scored by relevance, skill level, type preference, and recency.
 
 ## Super user bootstrap
 
