@@ -51,7 +51,6 @@ const drillSearchInput = document.getElementById("drillSearchInput");
 const drillResultCount = document.getElementById("drillResultCount");
 const saveRoutineBtn = document.getElementById("saveRoutineBtn");
 const saveRoutineNameInput = document.getElementById("saveRoutineNameInput");
-const customRoutineForm = document.getElementById("customRoutineForm");
 const upgradeBtn = document.getElementById("upgradeBtn");
 const usageText = document.getElementById("usageText");
 
@@ -74,6 +73,15 @@ const exportPdfBtn = document.getElementById("exportPdfBtn");
 const exportIcalBtn = document.getElementById("exportIcalBtn");
 const toastContainer = document.getElementById("toastContainer");
 const onboardingOverlay = document.getElementById("onboardingOverlay");
+
+const showHomeBtn = document.getElementById("showHomeBtn");
+const homePanel = document.getElementById("homePanel");
+const homeGreeting = document.getElementById("homeGreeting");
+const homeSubtitle = document.getElementById("homeSubtitle");
+const homeStatsRow = document.getElementById("homeStatsRow");
+const homeActiveRoutine = document.getElementById("homeActiveRoutine");
+const homeActiveRoutineCard = document.getElementById("homeActiveRoutineCard");
+const homeNewUserWrap = document.getElementById("homeNewUserWrap");
 
 const themeToggleBtn = document.getElementById("themeToggleBtn");
 const themeIcon = document.getElementById("themeIcon");
@@ -115,9 +123,12 @@ let currentUser = null;
 let savedRoutines = [];
 let isRegisterMode = false;
 let isGeneratingRoutine = false;
-let activePlanMode = "generated";
+let activePlanMode = "home";
 let drillLibraryCache = null;
 let pendingReflection = null;
+let customBuilderState = null;
+let customActiveSessionIndex = 0;
+let customDrillFilterType = null;
 const FREE_ROUTINE_LIMIT = 5;
 const ONBOARDING_ENABLED = false;
 let authGateCallback = null;
@@ -869,6 +880,7 @@ function setPlanMode(mode) {
   activePlanMode = mode;
   const planPanel = document.querySelector(".plan-panel");
 
+  homePanel.classList.add("hidden");
   generatedRoutineView.classList.add("hidden");
   customRoutineView.classList.add("hidden");
   drillLibraryPanel.classList.add("hidden");
@@ -876,17 +888,23 @@ function setPlanMode(mode) {
   savedPanel.classList.add("hidden");
   planPanel.classList.add("hidden");
 
+  showHomeBtn.classList.remove("active");
   showGeneratedRoutineBtn.classList.remove("active");
   showCustomRoutineBtn.classList.remove("active");
   showDrillLibraryBtn.classList.remove("active");
   showStatsBtn.classList.remove("active");
   showSavedBtn.classList.remove("active");
 
-  if (mode === "custom") {
+  if (mode === "home") {
+    homePanel.classList.remove("hidden");
+    showHomeBtn.classList.add("active");
+    renderHomeDashboard();
+  } else if (mode === "custom") {
     planPanel.classList.remove("hidden");
     customRoutineView.classList.remove("hidden");
     showCustomRoutineBtn.classList.add("active");
     planPanelTitle.textContent = "Custom Practice Routine";
+    if (!customBuilderState) showCustomStep(1);
   } else if (mode === "drills") {
     drillLibraryPanel.classList.remove("hidden");
     showDrillLibraryBtn.classList.add("active");
@@ -905,6 +923,67 @@ function setPlanMode(mode) {
     planPanelTitle.textContent = "Generated Practice Routine";
   }
   updateStepper();
+}
+
+function renderHomeDashboard() {
+  const isAuthed = Boolean(currentUser);
+
+  if (isAuthed) {
+    homeGreeting.textContent = `Welcome back, ${getDisplayFirstName()}`;
+    homeSubtitle.textContent = "Here's your training overview.";
+    homeNewUserWrap.classList.add("hidden");
+    homeStatsRow.classList.remove("hidden");
+
+    const totalRoutines = savedRoutines.length;
+    let completedSessions = 0;
+    for (const r of savedRoutines) {
+      completedSessions += Object.keys(r.completions || {}).length;
+    }
+    document.getElementById("homeStatRoutines").textContent = totalRoutines;
+    document.getElementById("homeStatCompleted").textContent = completedSessions;
+    document.getElementById("homeStatStreak").textContent = "-";
+
+    api("/api/stats").then((result) => {
+      document.getElementById("homeStatStreak").textContent = (result.stats.currentStreak || 0) + "d";
+    }).catch(() => {});
+
+    const activeRoutine = savedRoutines.find((r) => {
+      const prog = routineProgress(r);
+      return prog.pct < 100 && prog.total > 0;
+    });
+
+    if (activeRoutine) {
+      homeActiveRoutine.classList.remove("hidden");
+      const prog = routineProgress(activeRoutine);
+      homeActiveRoutineCard.innerHTML = "";
+      const card = document.createElement("div");
+      card.className = "home-active-card";
+      card.innerHTML = `
+        <div class="home-active-info">
+          <p class="saved-title">${activeRoutine.title}</p>
+          <p class="saved-meta">${activeRoutine.meta}</p>
+          <div class="saved-progress-wrap"><div class="saved-progress-bar" style="width:${prog.pct}%"></div></div>
+          <p class="saved-progress-text">${prog.done}/${prog.total} sessions (${prog.pct}%)</p>
+        </div>
+        <button class="btn btn-primary" type="button">Continue</button>`;
+      card.querySelector(".btn").addEventListener("click", () => {
+        currentRoutine = activeRoutine;
+        renderRoutine(currentRoutine);
+        hydrateForm(activeRoutine.profileSnapshot);
+        saveRoutineNameInput.value = activeRoutine.title || "";
+        setPlanMode("generated");
+      });
+      homeActiveRoutineCard.appendChild(card);
+    } else {
+      homeActiveRoutine.classList.add("hidden");
+    }
+  } else {
+    homeGreeting.textContent = "Welcome to thegolfbuild";
+    homeSubtitle.textContent = "Build personalized practice routines backed by a smart rules engine.";
+    homeStatsRow.classList.add("hidden");
+    homeActiveRoutine.classList.add("hidden");
+    homeNewUserWrap.classList.remove("hidden");
+  }
 }
 
 function getProfileFromForm() {
@@ -1116,6 +1195,7 @@ function renderRoutine(routine) {
 
   const completions = routine.completions || {};
   const isSaved = Boolean(routine.id);
+  saveRoutineBtn.textContent = isSaved ? "Update Routine" : "Save to Profile";
 
   routineWeeks.innerHTML = "";
   routine.weeks.forEach((week, wi) => {
@@ -1417,6 +1497,7 @@ async function loadUserData() {
   currentRoutine = null;
   renderRoutine(null);
   updateStepper();
+  if (activePlanMode === "home") renderHomeDashboard();
 }
 
 function updateAuthUi() {
@@ -1519,44 +1600,6 @@ async function logout() {
   setMessage("Logged out.");
 }
 
-function buildCustomRoutine() {
-  const title = document.getElementById("customTitle").value.trim();
-  const weeks = Number(document.getElementById("customWeeks").value);
-  const sessionsPerWeek = Number(document.getElementById("customSessions").value);
-  const tasks = document
-    .getElementById("customTasks")
-    .value.split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean);
-
-  if (!title || !weeks || !sessionsPerWeek || tasks.length === 0) {
-    throw new Error("Complete all custom routine fields.");
-  }
-
-  const weekBlocks = [];
-  for (let week = 1; week <= weeks; week += 1) {
-    const sessions = [];
-    for (let session = 1; session <= sessionsPerWeek; session += 1) {
-      sessions.push({
-        title: `Session ${session}`,
-        bullets: tasks
-      });
-    }
-
-    weekBlocks.push({
-      week,
-      headline: `Week ${week}: Custom Plan`,
-      sessions
-    });
-  }
-
-  return {
-    profileSnapshot: getProfileFromForm(),
-    title,
-    meta: `Custom routine • ${weeks} weeks • ${sessionsPerWeek} sessions/week`,
-    weeks: weekBlocks
-  };
-}
 
 registerBtn.addEventListener("click", register);
 loginBtn.addEventListener("click", login);
@@ -1623,11 +1666,18 @@ submitPasswordChangeBtn.addEventListener("click", async () => {
   }
 });
 
+showHomeBtn.addEventListener("click", () => setPlanMode("home"));
 showGeneratedRoutineBtn.addEventListener("click", () => setPlanMode("generated"));
 showCustomRoutineBtn.addEventListener("click", () => setPlanMode("custom"));
 showDrillLibraryBtn.addEventListener("click", () => setPlanMode("drills"));
 showStatsBtn.addEventListener("click", () => setPlanMode("stats"));
 showSavedBtn.addEventListener("click", () => setPlanMode("saved"));
+
+document.getElementById("homeGenerateBtn").addEventListener("click", () => setPlanMode("generated"));
+document.getElementById("homeCustomBtn").addEventListener("click", () => setPlanMode("custom"));
+document.getElementById("homeSavedBtn").addEventListener("click", () => setPlanMode("saved"));
+document.getElementById("homeDrillsBtn").addEventListener("click", () => setPlanMode("drills"));
+document.getElementById("homeGetStartedBtn").addEventListener("click", () => setPlanMode("generated"));
 
 document.getElementById("loadDemoBtnInline").addEventListener("click", () => {
   loadDemoBtn.click();
@@ -1706,21 +1756,50 @@ saveRoutineBtn.addEventListener("click", () => {
   requireAuth("Sign in to save routines", async () => {
     try {
       const customSaveName = saveRoutineNameInput.value.trim();
-      const routineToSave = customSaveName
-        ? { ...currentRoutine, title: customSaveName }
-        : currentRoutine;
+      const isUpdate = Boolean(currentRoutine.id);
 
-      const result = await api("/api/routines", {
-        method: "POST",
-        body: JSON.stringify({ routine: routineToSave })
-      });
+      if (isUpdate) {
+        // Update existing routine
+        const updates = {};
+        if (customSaveName && customSaveName !== currentRoutine.title) updates.title = customSaveName;
+        if (currentRoutine.meta) updates.meta = currentRoutine.meta;
+        if (currentRoutine.weeks) updates.weeks = currentRoutine.weeks;
 
-      savedRoutines = [result.routine, ...savedRoutines];
-      currentRoutine = result.routine;
-      setCachedRoutines(currentUser?.id, savedRoutines);
-      renderSavedRoutines();
-      renderRoutine(currentRoutine);
-      setMessage("Routine saved to your profile.");
+        if (Object.keys(updates).length === 0) {
+          setMessage("No changes to save.");
+          return;
+        }
+
+        const result = await api(`/api/routines/${currentRoutine.id}`, {
+          method: "PUT",
+          body: JSON.stringify(updates)
+        });
+
+        const idx = savedRoutines.findIndex((r) => r.id === currentRoutine.id);
+        if (idx !== -1) savedRoutines[idx] = result.routine;
+        currentRoutine = result.routine;
+        setCachedRoutines(currentUser?.id, savedRoutines);
+        renderSavedRoutines();
+        renderRoutine(currentRoutine);
+        setMessage("Routine updated.");
+      } else {
+        // Create new routine
+        const routineToSave = customSaveName
+          ? { ...currentRoutine, title: customSaveName }
+          : currentRoutine;
+
+        const result = await api("/api/routines", {
+          method: "POST",
+          body: JSON.stringify({ routine: routineToSave })
+        });
+
+        savedRoutines = [result.routine, ...savedRoutines];
+        currentRoutine = result.routine;
+        setCachedRoutines(currentUser?.id, savedRoutines);
+        renderSavedRoutines();
+        renderRoutine(currentRoutine);
+        setMessage("Routine saved to your profile.");
+      }
     } catch (err) {
       if (err.code === "UPGRADE_REQUIRED") {
         setMessage("You reached 5 total saved routines (generated + custom). Upgrade to Pro for unlimited.", true);
@@ -2111,18 +2190,315 @@ exportIcalBtn.addEventListener("click", () => {
   URL.revokeObjectURL(url);
 });
 
-customRoutineForm.addEventListener("submit", (event) => {
-  event.preventDefault();
+// Custom routine builder - Step 1: Setup
+document.getElementById("customSetupForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const title = document.getElementById("customTitle").value.trim();
+  const weeks = Number(document.getElementById("customWeeks").value);
+  const sessionsPerWeek = Number(document.getElementById("customSessions").value);
+  if (!title || !weeks || !sessionsPerWeek) return;
 
-  requireAuth("Sign in to create custom routines", () => {
-    try {
-      currentRoutine = buildCustomRoutine();
-      renderRoutine(currentRoutine);
-      saveRoutineNameInput.value = currentRoutine.title;
-      setMessage("Custom routine created. Save it to your profile.");
-    } catch (err) {
-      setMessage(err.message, true);
+  const totalSessions = sessionsPerWeek;
+  if (!customBuilderState || customBuilderState.title !== title) {
+    customBuilderState = { title, weeks, sessionsPerWeek, sessions: [] };
+  } else {
+    customBuilderState.title = title;
+    customBuilderState.weeks = weeks;
+    customBuilderState.sessionsPerWeek = sessionsPerWeek;
+  }
+  while (customBuilderState.sessions.length < totalSessions) {
+    customBuilderState.sessions.push({ title: `Session ${customBuilderState.sessions.length + 1}`, items: [] });
+  }
+  customBuilderState.sessions.length = totalSessions;
+
+  if (!drillLibraryCache) {
+    api("/api/drills").then((r) => { drillLibraryCache = r.drills; }).catch(() => {});
+  }
+  showCustomStep(2);
+});
+
+function showCustomStep(step) {
+  document.getElementById("customStep1").classList.toggle("hidden", step !== 1);
+  document.getElementById("customStep2").classList.toggle("hidden", step !== 2);
+  document.getElementById("customStep3").classList.toggle("hidden", step !== 3);
+  if (step === 2) {
+    renderCustomSessionTabs();
+    renderCustomSessionEditor();
+  } else if (step === 3) {
+    renderCustomPreview();
+  }
+}
+
+function renderCustomSessionTabs() {
+  const tabs = document.getElementById("customSessionTabs");
+  tabs.innerHTML = "";
+  customBuilderState.sessions.forEach((session, i) => {
+    const btn = document.createElement("button");
+    btn.className = "custom-session-tab" + (i === customActiveSessionIndex ? " active" : "");
+    btn.type = "button";
+    const count = session.items.length;
+    btn.textContent = session.title + (count ? ` (${count})` : "");
+    btn.addEventListener("click", () => {
+      customActiveSessionIndex = i;
+      renderCustomSessionTabs();
+      renderCustomSessionEditor();
+    });
+    tabs.appendChild(btn);
+  });
+}
+
+function renderCustomSessionEditor() {
+  const session = customBuilderState.sessions[customActiveSessionIndex];
+  document.getElementById("customSessionTitle").textContent = session.title;
+  renderCustomSessionItems();
+}
+
+function renderCustomSessionItems() {
+  const container = document.getElementById("customSessionItems");
+  const session = customBuilderState.sessions[customActiveSessionIndex];
+  container.innerHTML = "";
+
+  if (session.items.length === 0) {
+    container.innerHTML = '<p class="custom-empty-hint">No items yet. Search drills above or add a custom task.</p>';
+    return;
+  }
+
+  session.items.forEach((item, idx) => {
+    const el = document.createElement("div");
+    el.className = "custom-session-item";
+    el.setAttribute("draggable", "true");
+    el.dataset.dragIdx = idx;
+
+    const chipClass = item.type === "drill" ? (item.drillType || "technical") : "reflection";
+    const chipLabel = item.type === "drill" ? (item.drillType || "drill") : "custom";
+
+    el.innerHTML = `
+      <span class="drag-handle" title="Drag to reorder">&#8801;</span>
+      <span class="drill-chip ${chipClass}">${chipLabel}</span>
+      <div class="custom-item-info">
+        <p class="custom-item-name">${item.name}</p>
+      </div>
+      <div class="custom-item-duration">
+        <input type="number" min="1" max="120" value="${item.duration || 15}" data-item-idx="${idx}" />
+        <span style="font-size:0.75rem;color:var(--muted)">min</span>
+      </div>
+      <button class="custom-item-remove" data-remove-idx="${idx}" type="button">&times;</button>
+    `;
+    container.appendChild(el);
+  });
+
+  container.querySelectorAll(".custom-item-duration input").forEach((inp) => {
+    inp.addEventListener("change", () => {
+      session.items[Number(inp.dataset.itemIdx)].duration = Number(inp.value) || 15;
+    });
+  });
+
+  container.querySelectorAll(".custom-item-remove").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      session.items.splice(Number(btn.dataset.removeIdx), 1);
+      renderCustomSessionItems();
+      renderCustomSessionTabs();
+    });
+  });
+
+  // Drag-drop reorder
+  let dragFrom = null;
+  container.querySelectorAll(".custom-session-item").forEach((el) => {
+    el.addEventListener("dragstart", (e) => {
+      dragFrom = Number(el.dataset.dragIdx);
+      el.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
+    });
+    el.addEventListener("dragend", () => {
+      el.classList.remove("dragging");
+      container.querySelectorAll(".custom-session-item").forEach((x) => x.classList.remove("drag-over"));
+    });
+    el.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      container.querySelectorAll(".custom-session-item").forEach((x) => x.classList.remove("drag-over"));
+      el.classList.add("drag-over");
+    });
+    el.addEventListener("drop", (e) => {
+      e.preventDefault();
+      const dragTo = Number(el.dataset.dragIdx);
+      if (dragFrom !== null && dragFrom !== dragTo) {
+        const [moved] = session.items.splice(dragFrom, 1);
+        session.items.splice(dragTo, 0, moved);
+        renderCustomSessionItems();
+      }
+    });
+  });
+}
+
+// Drill search within custom builder
+document.getElementById("customDrillSearch").addEventListener("input", (e) => {
+  const query = e.target.value.trim().toLowerCase();
+  const resultsEl = document.getElementById("customDrillResults");
+
+  if (!query || query.length < 2 || !drillLibraryCache) {
+    resultsEl.classList.add("hidden");
+    return;
+  }
+
+  const filtered = drillLibraryCache.filter((drill) => {
+    if (!drill.name.toLowerCase().includes(query) && !drill.description.toLowerCase().includes(query)) return false;
+    if (customDrillFilterType && drill.type !== customDrillFilterType) return false;
+    return true;
+  }).slice(0, 10);
+
+  resultsEl.classList.remove("hidden");
+  resultsEl.innerHTML = "";
+
+  if (filtered.length === 0) {
+    resultsEl.innerHTML = '<p class="custom-empty-hint">No matching drills.</p>';
+    return;
+  }
+
+  filtered.forEach((drill) => {
+    const row = document.createElement("div");
+    row.className = "custom-drill-result";
+    row.innerHTML = `
+      <div class="custom-drill-result-info">
+        <p class="custom-drill-result-name">${drill.name}</p>
+        <p class="custom-drill-result-meta">${drill.type} &middot; ${drill.levels.join(", ")}</p>
+      </div>
+      <button class="btn btn-outline btn-sm" type="button">+ Add</button>
+    `;
+    row.querySelector(".btn").addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      addDrillToCustomSession(drill);
+    });
+    row.querySelector(".custom-drill-result-info").addEventListener("click", () => {
+      openDrillModal(drill);
+    });
+    resultsEl.appendChild(row);
+  });
+});
+
+document.querySelectorAll(".custom-filter").forEach((chip) => {
+  chip.addEventListener("click", () => {
+    const val = chip.dataset.filterValue;
+    if (customDrillFilterType === val) {
+      customDrillFilterType = null;
+      chip.classList.remove("active");
+    } else {
+      document.querySelectorAll(".custom-filter").forEach((c) => c.classList.remove("active"));
+      customDrillFilterType = val;
+      chip.classList.add("active");
     }
+    document.getElementById("customDrillSearch").dispatchEvent(new Event("input"));
+  });
+});
+
+function addDrillToCustomSession(drill) {
+  const session = customBuilderState.sessions[customActiveSessionIndex];
+  session.items.push({
+    type: "drill",
+    drillId: drill.id,
+    drillType: drill.type,
+    name: drill.name,
+    description: drill.description,
+    duration: 15
+  });
+  renderCustomSessionItems();
+  renderCustomSessionTabs();
+  showToast(`Added "${drill.name}"`);
+}
+
+document.getElementById("customAddTaskBtn").addEventListener("click", () => {
+  const nameInput = document.getElementById("customTaskInput");
+  const durInput = document.getElementById("customTaskDuration");
+  const name = nameInput.value.trim();
+  const duration = Number(durInput.value) || 15;
+
+  if (!name) { showToast("Enter a task name.", true); return; }
+
+  const session = customBuilderState.sessions[customActiveSessionIndex];
+  session.items.push({ type: "custom", name, description: "", duration });
+  nameInput.value = "";
+  renderCustomSessionItems();
+  renderCustomSessionTabs();
+});
+
+document.getElementById("customBackToSetupBtn").addEventListener("click", () => showCustomStep(1));
+document.getElementById("customToPreviewBtn").addEventListener("click", () => {
+  const hasItems = customBuilderState.sessions.some((s) => s.items.length > 0);
+  if (!hasItems) { showToast("Add at least one drill or task to a session.", true); return; }
+  showCustomStep(3);
+});
+document.getElementById("customBackToEditorBtn").addEventListener("click", () => showCustomStep(2));
+
+function renderCustomPreview() {
+  const container = document.getElementById("customPreviewContent");
+  const state = customBuilderState;
+  container.innerHTML = "";
+
+  const header = document.createElement("div");
+  header.className = "routine-header";
+  header.innerHTML = `<div class="routine-header-info">
+    <p class="routine-title">${state.title}</p>
+    <p class="routine-meta">Custom routine \u2022 ${state.weeks} weeks \u2022 ${state.sessionsPerWeek} sessions/week</p>
+  </div>`;
+  container.appendChild(header);
+
+  for (let w = 0; w < state.weeks; w++) {
+    const weekEl = document.createElement("section");
+    weekEl.className = "week-block";
+    weekEl.innerHTML = `<div class="week-header"><h3>Week ${w + 1}: Custom Plan</h3></div>`;
+    const sessionsEl = document.createElement("div");
+    sessionsEl.className = "week-sessions";
+
+    state.sessions.forEach((session) => {
+      const card = document.createElement("div");
+      card.className = "session-card";
+      const totalMin = session.items.reduce((sum, item) => sum + (item.duration || 0), 0);
+      card.innerHTML = `
+        <div class="session-card-header">
+          <div class="session-card-title"><label>${session.title}</label></div>
+          <span style="font-size:0.78rem;color:var(--muted)">${totalMin} min</span>
+        </div>
+        <div class="session-card-body">
+          ${session.items.map((item) => `
+            <div class="drill-block">
+              <span class="drill-chip ${item.type === "drill" ? (item.drillType || "technical") : "reflection"}">${item.duration} min</span>
+              <span class="drill-text">${item.name}</span>
+            </div>`).join("")}
+        </div>`;
+      sessionsEl.appendChild(card);
+    });
+
+    weekEl.appendChild(sessionsEl);
+    container.appendChild(weekEl);
+  }
+}
+
+document.getElementById("customCreateBtn").addEventListener("click", () => {
+  requireAuth("Sign in to create custom routines", () => {
+    const state = customBuilderState;
+    const weekBlocks = [];
+    for (let w = 0; w < state.weeks; w++) {
+      const sessions = state.sessions.map((session) => ({
+        title: session.title,
+        bullets: session.items.map((item) => `${item.duration} min ${item.name}`),
+        drillIds: session.items.filter((item) => item.drillId).map((item) => item.drillId)
+      }));
+      weekBlocks.push({ week: w + 1, headline: `Week ${w + 1}: Custom Plan`, sessions });
+    }
+
+    currentRoutine = {
+      profileSnapshot: getProfileFromForm(),
+      title: state.title,
+      meta: `Custom routine \u2022 ${state.weeks} weeks \u2022 ${state.sessionsPerWeek} sessions/week`,
+      weeks: weekBlocks
+    };
+
+    renderRoutine(currentRoutine);
+    saveRoutineNameInput.value = currentRoutine.title;
+    customBuilderState = null;
+    customActiveSessionIndex = 0;
+    setPlanMode("generated");
+    showToast("Custom routine created. Save it to your profile.");
   });
 });
 
@@ -2177,7 +2553,7 @@ function initOnboarding() {
 
 (async function init() {
   initOnboarding();
-  setPlanMode("generated");
+  setPlanMode("home");
   updateAuthUi();
 
   const token = getToken();

@@ -1,4 +1,4 @@
-const CACHE_NAME = "golfbuild-v4";
+const CACHE_NAME = "golfbuild-v5";
 const STATIC_ASSETS = [
   "/",
   "/index.html",

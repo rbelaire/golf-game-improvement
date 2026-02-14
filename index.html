@@ -99,7 +99,10 @@
     </header>
 
     <nav class="tab-bar">
-      <button id="showGeneratedRoutineBtn" class="tab-btn active" type="button">
+      <button id="showHomeBtn" class="tab-btn active" type="button">
+        <span class="tab-icon">&#9750;</span><span class="tab-label">Home</span>
+      </button>
+      <button id="showGeneratedRoutineBtn" class="tab-btn" type="button">
         <span class="tab-icon">&#9776;</span><span class="tab-label">Routine</span>
       </button>
       <button id="showCustomRoutineBtn" class="tab-btn" type="button">
@@ -117,6 +120,45 @@
     </nav>
 
     <main class="layout">
+      <section id="homePanel" class="panel home-panel hidden">
+        <div class="home-welcome">
+          <h2 id="homeGreeting">Welcome to thegolfbuild</h2>
+          <p id="homeSubtitle" class="plan-mode-note">Build personalized practice routines backed by a smart rules engine.</p>
+        </div>
+
+        <div id="homeStatsRow" class="home-stats-row hidden">
+          <div class="stat-card">
+            <p class="stat-value" id="homeStatRoutines">-</p>
+            <p class="stat-label">Saved</p>
+          </div>
+          <div class="stat-card">
+            <p class="stat-value" id="homeStatCompleted">-</p>
+            <p class="stat-label">Done</p>
+          </div>
+          <div class="stat-card">
+            <p class="stat-value" id="homeStatStreak">-</p>
+            <p class="stat-label">Streak</p>
+          </div>
+        </div>
+
+        <div id="homeActiveRoutine" class="home-active-routine hidden">
+          <h3>Continue Training</h3>
+          <div id="homeActiveRoutineCard"></div>
+        </div>
+
+        <div class="home-actions">
+          <button id="homeGenerateBtn" class="btn btn-primary home-action-btn" type="button">Generate Routine</button>
+          <button id="homeCustomBtn" class="btn btn-outline home-action-btn" type="button">Build Custom</button>
+          <button id="homeSavedBtn" class="btn btn-outline home-action-btn" type="button">View Saved</button>
+          <button id="homeDrillsBtn" class="btn btn-outline home-action-btn" type="button">Browse Drills</button>
+        </div>
+
+        <div id="homeNewUserWrap" class="home-new-user-wrap hidden">
+          <p class="plan-mode-note">Get started by setting up your profile and generating your first routine.</p>
+          <button id="homeGetStartedBtn" class="btn btn-primary" type="button">Set Up Profile</button>
+        </div>
+      </section>
+
       <section id="authPanel" class="panel auth-panel">
         <div class="auth-head">
           <h2>Account</h2>
@@ -270,29 +312,81 @@
         <div id="customRoutineView" class="hidden">
           <div class="panel-subsection custom-subsection">
             <h3>Custom Routine Builder</h3>
-            <p class="plan-mode-note">Create your own drill sequence and structure it exactly how you want.</p>
+            <p class="plan-mode-note">Build your own routine with drills from the library or custom tasks.</p>
           </div>
-          <form id="customRoutineForm" class="form-stack">
-            <label>
-              Custom Routine Title
-              <input type="text" id="customTitle" placeholder="My 3-Week Short Game Sprint" required />
-            </label>
-            <div class="inline-fields">
+
+          <!-- Step 1: Setup -->
+          <div id="customStep1" class="custom-step">
+            <form id="customSetupForm" class="form-stack">
               <label>
-                Weeks
-                <input type="number" id="customWeeks" min="1" max="12" value="3" required />
+                Routine Title
+                <input type="text" id="customTitle" placeholder="My 3-Week Short Game Sprint" required />
               </label>
-              <label>
-                Sessions / week
-                <input type="number" id="customSessions" min="1" max="7" value="3" required />
-              </label>
+              <div class="inline-fields">
+                <label>
+                  Weeks
+                  <input type="number" id="customWeeks" min="1" max="12" value="3" required />
+                </label>
+                <label>
+                  Sessions / week
+                  <input type="number" id="customSessions" min="1" max="7" value="3" required />
+                </label>
+              </div>
+              <button class="btn btn-primary" type="submit">Next: Build Sessions</button>
+            </form>
+          </div>
+
+          <!-- Step 2: Session Builder -->
+          <div id="customStep2" class="custom-step hidden">
+            <div class="custom-session-tabs" id="customSessionTabs"></div>
+
+            <div id="customSessionEditor" class="custom-session-editor">
+              <h4 id="customSessionTitle">Session 1</h4>
+
+              <div class="custom-drill-picker">
+                <input type="text" id="customDrillSearch" placeholder="Search drills to add..." />
+                <div class="custom-picker-filters">
+                  <button class="filter-chip custom-filter" data-filter-value="warmup" type="button">Warmup</button>
+                  <button class="filter-chip custom-filter" data-filter-value="technical" type="button">Technical</button>
+                  <button class="filter-chip custom-filter" data-filter-value="pressure" type="button">Pressure</button>
+                  <button class="filter-chip custom-filter" data-filter-value="transfer" type="button">Transfer</button>
+                </div>
+                <div id="customDrillResults" class="custom-drill-results hidden"></div>
+              </div>
+
+              <div class="custom-manual-add">
+                <div class="inline-fields">
+                  <label class="custom-manual-label-wide">
+                    Custom task
+                    <input type="text" id="customTaskInput" placeholder="e.g. Bunker exits from wet sand" />
+                  </label>
+                  <label class="custom-manual-label-narrow">
+                    Min
+                    <input type="number" id="customTaskDuration" min="1" max="120" value="15" />
+                  </label>
+                </div>
+                <button id="customAddTaskBtn" class="btn btn-outline btn-sm" type="button">+ Add Custom Task</button>
+              </div>
+
+              <div id="customSessionItems" class="custom-session-items">
+                <p class="custom-empty-hint">No items yet. Search drills above or add a custom task.</p>
+              </div>
+
+              <div class="cta-row">
+                <button id="customBackToSetupBtn" class="btn btn-outline" type="button">Back</button>
+                <button id="customToPreviewBtn" class="btn btn-primary" type="button">Preview Routine</button>
+              </div>
             </div>
-            <label>
-              Session Plan (one line per task)
-              <textarea id="customTasks" rows="4" placeholder="15 min putting ladder&#10;30 min wedge distance control&#10;20 min bunker exits" required></textarea>
-            </label>
-            <button class="btn btn-outline" type="submit">Create Custom Routine</button>
-          </form>
+          </div>
+
+          <!-- Step 3: Preview -->
+          <div id="customStep3" class="custom-step hidden">
+            <div id="customPreviewContent"></div>
+            <div class="cta-row">
+              <button id="customBackToEditorBtn" class="btn btn-outline" type="button">Back to Editor</button>
+              <button id="customCreateBtn" class="btn btn-primary" type="button">Create Routine</button>
+            </div>
+          </div>
         </div>
       </section>
 
