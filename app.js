@@ -99,9 +99,15 @@ let pendingReflection = null;
 const FREE_ROUTINE_LIMIT = 5;
 const ONBOARDING_ENABLED = false;
 
+function setOverlayVisible(el, visible) {
+  if (!el) return;
+  el.classList.toggle("hidden", !visible);
+  el.hidden = !visible;
+}
+
 function forceCloseBlockingOverlays() {
   [onboardingOverlay, confirmModal, reflectionModal, drillModal].forEach((el) => {
-    if (el) el.classList.add("hidden");
+    setOverlayVisible(el, false);
   });
   localStorage.setItem("thegolfbuild_onboarded", "1");
 }
@@ -132,11 +138,11 @@ function openConfirmModal(title, message, onConfirm) {
   confirmModalTitle.textContent = title;
   confirmModalMessage.textContent = message;
   confirmCallback = onConfirm;
-  confirmModal.classList.remove("hidden");
+  setOverlayVisible(confirmModal, true);
 }
 
 function closeConfirmModal() {
-  confirmModal.classList.add("hidden");
+  setOverlayVisible(confirmModal, false);
   confirmCallback = null;
 }
 
@@ -174,7 +180,7 @@ document.addEventListener("keydown", (e) => {
       return;
     }
     if (onboardingOverlay && !onboardingOverlay.classList.contains("hidden")) {
-      onboardingOverlay.classList.add("hidden");
+      setOverlayVisible(onboardingOverlay, false);
       localStorage.setItem("thegolfbuild_onboarded", "1");
     }
   }
@@ -337,11 +343,11 @@ function openDrillModal(drill) {
     drillModalSwap.classList.add("hidden");
   }
 
-  drillModal.classList.remove("hidden");
+  setOverlayVisible(drillModal, true);
 }
 
 function closeDrillModal() {
-  drillModal.classList.add("hidden");
+  setOverlayVisible(drillModal, false);
 }
 
 drillModalClose.addEventListener("click", closeDrillModal);
@@ -382,11 +388,11 @@ function openReflectionModal(routineId, key) {
   reflectionStars.querySelectorAll(".star").forEach((s) => s.classList.remove("active"));
   reflectionTags.querySelectorAll(".tag-btn").forEach((b) => b.classList.remove("selected"));
   pendingReflection = { routineId, key };
-  reflectionModal.classList.remove("hidden");
+  setOverlayVisible(reflectionModal, true);
 }
 
 function closeReflectionModal() {
-  reflectionModal.classList.add("hidden");
+  setOverlayVisible(reflectionModal, false);
   pendingReflection = null;
 }
 
@@ -1819,9 +1825,9 @@ function initOnboarding() {
   }
   if (localStorage.getItem(key)) return;
 
-  onboardingOverlay.classList.remove("hidden");
+  setOverlayVisible(onboardingOverlay, true);
   function closeOnboarding() {
-    onboardingOverlay.classList.add("hidden");
+    setOverlayVisible(onboardingOverlay, false);
     localStorage.setItem(key, "1");
   }
 
