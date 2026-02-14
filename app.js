@@ -1108,9 +1108,16 @@ function focusMapByWeakness(weakness) {
   const mapping = {
     "Driving accuracy": ["fairway finder drill", "launch window control", "pressure tee shots"],
     "Approach consistency": ["distance ladder work", "shot-shape rehearsal", "target proximity challenge"],
+    "Ball striking": ["impact quality audit", "low point control", "compression drill"],
     "Short game touch": ["landing zone precision", "up-and-down circuits", "bunker variability"],
+    "Chipping & pitching": ["landing spot drill", "trajectory selection", "scramble chip practice"],
     "Putting confidence": ["start-line gate drill", "3-6-9 pressure ladder", "green reading reps"],
-    "Course management": ["club selection simulation", "risk/reward decision reps", "post-round strategy review"]
+    "Lag putting": ["speed calibration drill", "30-foot zone work", "three-putt eliminator"],
+    "Distance control": ["yardage ladder", "partial swing chart", "scoring zone blitz"],
+    "Course management": ["club selection simulation", "risk/reward decision reps", "post-round strategy review"],
+    "Mental game": ["pre-shot commitment", "emotional reset protocol", "pressure composure drill"],
+    "Fairway woods & hybrids": ["sweep contact drill", "off-the-deck progression", "fairway wood strategy"],
+    "Scoring under pressure": ["par saver challenge", "must-make putts", "close-out drill"]
   };
 
   return mapping[weakness] || ["full swing calibration", "short game fundamentals", "mental reset routine"];
@@ -1876,7 +1883,7 @@ async function loadDrillLibrary() {
 
 function renderDrillLibrary(drills) {
   const groups = {};
-  const weaknessOrder = ["Driving accuracy", "Approach consistency", "Short game touch", "Putting confidence", "Course management"];
+  const weaknessOrder = ["Driving accuracy", "Approach consistency", "Ball striking", "Short game touch", "Chipping & pitching", "Putting confidence", "Lag putting", "Distance control", "Course management", "Mental game", "Fairway woods & hybrids", "Scoring under pressure"];
   for (const drill of drills) {
     const primary = drill.weaknesses[0] || "General";
     if (!groups[primary]) groups[primary] = [];
