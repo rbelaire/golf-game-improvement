@@ -37,6 +37,17 @@
   --grid-line: rgba(0, 0, 0, 0.04);
 }
 
+/* Light theme: use darker chip/badge text for contrast on white */
+[data-theme="light"] .drill-chip.warmup { background: rgba(255, 152, 0, 0.15); color: #e65100; border-color: rgba(255, 152, 0, 0.4); }
+[data-theme="light"] .drill-chip.technical { background: rgba(33, 150, 243, 0.15); color: #0d47a1; border-color: rgba(33, 150, 243, 0.4); }
+[data-theme="light"] .drill-chip.pressure { background: rgba(244, 67, 54, 0.15); color: #b71c1c; border-color: rgba(244, 67, 54, 0.4); }
+[data-theme="light"] .drill-chip.transfer { background: rgba(156, 39, 176, 0.15); color: #6a1b9a; border-color: rgba(156, 39, 176, 0.4); }
+[data-theme="light"] .drill-chip.reflection { background: rgba(76, 175, 80, 0.15); color: #1b5e20; border-color: rgba(76, 175, 80, 0.4); }
+[data-theme="light"] .modal-badge.type-warmup { background: rgba(255, 152, 0, 0.15); color: #e65100; border-color: rgba(255, 152, 0, 0.4); }
+[data-theme="light"] .modal-badge.type-technical { background: rgba(33, 150, 243, 0.15); color: #0d47a1; border-color: rgba(33, 150, 243, 0.4); }
+[data-theme="light"] .modal-badge.type-pressure { background: rgba(244, 67, 54, 0.15); color: #b71c1c; border-color: rgba(244, 67, 54, 0.4); }
+[data-theme="light"] .modal-badge.type-transfer { background: rgba(156, 39, 176, 0.15); color: #6a1b9a; border-color: rgba(156, 39, 176, 0.4); }
+
 * {
   box-sizing: border-box;
 }
@@ -400,8 +411,9 @@ h2 {
 .profile-tag {
   display: inline-block;
   padding: 0.2rem 0.65rem;
-  background: var(--accent-soft, rgba(76, 175, 80, 0.15));
+  background: var(--green-soft);
   color: var(--text);
+  border: 1px solid var(--green);
   border-radius: 999px;
   font-size: 0.82rem;
   white-space: nowrap;
@@ -768,33 +780,33 @@ button:disabled {
 }
 
 .drill-chip.warmup {
-  background: rgba(255, 183, 77, 0.15);
-  color: #ffb74d;
-  border: 1px solid rgba(255, 183, 77, 0.25);
+  background: rgba(255, 183, 77, 0.25);
+  color: #ffd180;
+  border: 1px solid rgba(255, 183, 77, 0.5);
 }
 
 .drill-chip.technical {
-  background: rgba(66, 165, 245, 0.15);
-  color: #42a5f5;
-  border: 1px solid rgba(66, 165, 245, 0.25);
+  background: rgba(66, 165, 245, 0.25);
+  color: #90caf9;
+  border: 1px solid rgba(66, 165, 245, 0.5);
 }
 
 .drill-chip.pressure {
-  background: rgba(239, 83, 80, 0.15);
-  color: #ef5350;
-  border: 1px solid rgba(239, 83, 80, 0.25);
+  background: rgba(239, 83, 80, 0.25);
+  color: #ef9a9a;
+  border: 1px solid rgba(239, 83, 80, 0.5);
 }
 
 .drill-chip.transfer {
-  background: rgba(171, 71, 188, 0.15);
-  color: #ab47bc;
-  border: 1px solid rgba(171, 71, 188, 0.25);
+  background: rgba(171, 71, 188, 0.25);
+  color: #ce93d8;
+  border: 1px solid rgba(171, 71, 188, 0.5);
 }
 
 .drill-chip.reflection {
-  background: rgba(76, 175, 80, 0.15);
-  color: var(--green);
-  border: 1px solid rgba(76, 175, 80, 0.25);
+  background: rgba(76, 175, 80, 0.25);
+  color: #a5d6a7;
+  border: 1px solid rgba(76, 175, 80, 0.5);
 }
 
 .drill-text {
@@ -913,7 +925,7 @@ button:disabled {
 .drill-item-tags {
   margin: 0.2rem 0 0;
   font-size: 0.78rem;
-  color: var(--muted);
+  color: var(--text);
 }
 
 .drill-item-desc {
@@ -1185,9 +1197,9 @@ button:disabled {
 .filter-chip {
   padding: 0.25rem 0.55rem;
   border-radius: 20px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--muted);
   background: transparent;
-  color: var(--muted);
+  color: var(--text);
   font: 500 0.78rem "Space Grotesk", sans-serif;
   cursor: pointer;
   transition: all 200ms ease;
@@ -1196,6 +1208,7 @@ button:disabled {
 .filter-chip:hover {
   border-color: var(--green);
   color: var(--green);
+  background: var(--green-soft);
 }
 
 .filter-chip.active {
@@ -1306,9 +1319,10 @@ button:disabled {
 .practice-log-tag {
   padding: 0.1rem 0.4rem;
   border-radius: 10px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--green);
+  background: var(--green-soft);
   font-size: 0.7rem;
-  color: var(--muted);
+  color: var(--text);
 }
 
 .practice-log-note {
@@ -1575,14 +1589,14 @@ button:disabled {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.03em;
-  border: 1px solid var(--line);
-  color: var(--muted);
+  border: 1px solid var(--text);
+  color: var(--text);
 }
 
-.modal-badge.type-warmup { color: #ffb74d; border-color: rgba(255, 183, 77, 0.3); }
-.modal-badge.type-technical { color: #42a5f5; border-color: rgba(66, 165, 245, 0.3); }
-.modal-badge.type-pressure { color: #ef5350; border-color: rgba(239, 83, 80, 0.3); }
-.modal-badge.type-transfer { color: #ab47bc; border-color: rgba(171, 71, 188, 0.3); }
+.modal-badge.type-warmup { color: #ffd180; border-color: rgba(255, 183, 77, 0.5); background: rgba(255, 183, 77, 0.25); }
+.modal-badge.type-technical { color: #90caf9; border-color: rgba(66, 165, 245, 0.5); background: rgba(66, 165, 245, 0.25); }
+.modal-badge.type-pressure { color: #ef9a9a; border-color: rgba(239, 83, 80, 0.5); background: rgba(239, 83, 80, 0.25); }
+.modal-badge.type-transfer { color: #ce93d8; border-color: rgba(171, 71, 188, 0.5); background: rgba(171, 71, 188, 0.25); }
 
 .modal-desc {
   color: var(--muted);
@@ -1648,9 +1662,9 @@ button:disabled {
 .tag-btn {
   padding: 0.3rem 0.65rem;
   border-radius: 20px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--muted);
   background: transparent;
-  color: var(--muted);
+  color: var(--text);
   font: 500 0.8rem "Space Grotesk", sans-serif;
   cursor: pointer;
   transition: all 200ms ease;
@@ -1659,6 +1673,7 @@ button:disabled {
 .tag-btn:hover {
   border-color: var(--green);
   color: var(--green);
+  background: var(--green-soft);
 }
 
 .tag-btn.selected {
