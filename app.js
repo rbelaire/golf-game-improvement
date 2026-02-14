@@ -18,6 +18,10 @@ const showLoginBtn = document.getElementById("showLoginBtn");
 const registerNameField = document.getElementById("registerNameField");
 
 const profileForm = document.getElementById("profileForm");
+const profileFormWrap = document.getElementById("profileFormWrap");
+const profileSummary = document.getElementById("profileSummary");
+const editProfileBtn = document.getElementById("editProfileBtn");
+const summaryGenerateBtn = document.getElementById("summaryGenerateBtn");
 const generateRoutineBtn = document.getElementById("generateRoutineBtn");
 const clearProfileBtn = document.getElementById("clearProfileBtn");
 const loadDemoBtn = document.getElementById("loadDemoBtn");
@@ -610,7 +614,6 @@ function getDisplayFirstName() {
 function setPlanMode(mode) {
   activePlanMode = mode;
   const planPanel = document.querySelector(".plan-panel");
-  const profilePanel = document.querySelector(".profile-panel");
 
   generatedRoutineView.classList.add("hidden");
   customRoutineView.classList.add("hidden");
@@ -618,7 +621,6 @@ function setPlanMode(mode) {
   statsPanel.classList.add("hidden");
   savedPanel.classList.add("hidden");
   planPanel.classList.add("hidden");
-  profilePanel.classList.add("hidden");
 
   showGeneratedRoutineBtn.classList.remove("active");
   showCustomRoutineBtn.classList.remove("active");
@@ -628,7 +630,6 @@ function setPlanMode(mode) {
 
   if (mode === "custom") {
     planPanel.classList.remove("hidden");
-    profilePanel.classList.remove("hidden");
     customRoutineView.classList.remove("hidden");
     showCustomRoutineBtn.classList.add("active");
     planPanelTitle.textContent = "Custom Practice Routine";
@@ -645,7 +646,6 @@ function setPlanMode(mode) {
     showSavedBtn.classList.add("active");
   } else {
     planPanel.classList.remove("hidden");
-    profilePanel.classList.remove("hidden");
     generatedRoutineView.classList.remove("hidden");
     showGeneratedRoutineBtn.classList.add("active");
     planPanelTitle.textContent = "Generated Practice Routine";
@@ -670,6 +670,30 @@ function hydrateForm(profile) {
   document.getElementById("daysPerWeek").value = profile?.daysPerWeek || 3;
   document.getElementById("hoursPerSession").value = profile?.hoursPerSession || 1.5;
   document.getElementById("notes").value = profile?.notes || "";
+}
+
+function isProfileComplete(profile) {
+  return profile && profile.name && profile.handicap && profile.weakness;
+}
+
+function renderProfileSummary(profile) {
+  if (!isProfileComplete(profile)) {
+    profileSummary.classList.add("hidden");
+    profileFormWrap.classList.remove("collapsed");
+    return;
+  }
+  document.getElementById("summaryName").textContent = profile.name;
+  document.getElementById("summaryHandicap").textContent = profile.handicap.replace(/\s*\(.*\)/, "");
+  document.getElementById("summaryWeakness").textContent = profile.weakness;
+  document.getElementById("summarySchedule").textContent =
+    (profile.daysPerWeek || 3) + "d/wk \u00B7 " + (profile.hoursPerSession || 1.5) + "h";
+  profileSummary.classList.remove("hidden");
+  profileFormWrap.classList.add("collapsed");
+}
+
+function expandProfileForm() {
+  profileFormWrap.classList.remove("collapsed");
+  profileSummary.classList.add("hidden");
 }
 
 function lockPlanner(locked) {
@@ -1125,6 +1149,7 @@ async function loadUserData() {
   const [profileRes, routineRes] = await Promise.all([api("/api/profile"), api("/api/routines")]);
   const profile = profileRes.profile || getCachedProfile(currentUser.id) || { name: currentUser.name };
   hydrateForm(profile);
+  renderProfileSummary(profile);
   setCachedProfile(currentUser.id, profile);
   savedRoutines = routineRes.routines || [];
   renderSavedRoutines();
@@ -1394,6 +1419,7 @@ profileForm.addEventListener("submit", async (event) => {
     });
     currentRoutine = generation.routine;
     renderRoutine(currentRoutine);
+    renderProfileSummary(profile);
     setMessage("Routine generated with smart rules engine. Save it when ready.");
   } catch (err) {
     setMessage(err.message, true);
@@ -1433,11 +1459,20 @@ saveRoutineBtn.addEventListener("click", async () => {
   }
 });
 
+editProfileBtn.addEventListener("click", () => {
+  expandProfileForm();
+});
+
+summaryGenerateBtn.addEventListener("click", () => {
+  profileForm.requestSubmit();
+});
+
 clearProfileBtn.addEventListener("click", () => {
   if (!currentUser) return;
 
   openConfirmModal("Clear Profile", "Are you sure you want to clear your profile? Your saved routines will not be affected.", async () => {
     hydrateForm({ name: currentUser.name });
+    renderProfileSummary(null);
     currentRoutine = null;
     renderRoutine(null);
 

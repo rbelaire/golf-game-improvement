@@ -368,16 +368,62 @@ h2 {
   grid-column: span 12;
 }
 
-.profile-panel {
-  grid-column: span 4;
-}
-
 .plan-panel {
-  grid-column: span 8;
+  grid-column: span 12;
 }
 
 .saved-panel {
   grid-column: span 12;
+}
+
+/* Profile summary bar */
+.profile-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.6rem 1rem;
+  background: var(--surface-alt, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.profile-summary-tags {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.profile-tag {
+  display: inline-block;
+  padding: 0.2rem 0.65rem;
+  background: var(--accent-soft, rgba(76, 175, 80, 0.15));
+  color: var(--text);
+  border-radius: 999px;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.profile-summary-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.btn-sm {
+  padding: 0.3rem 0.75rem;
+  font-size: 0.82rem;
+}
+
+.profile-form-wrap {
+  margin-bottom: 1rem;
+}
+
+.profile-form-wrap.collapsed {
+  display: none;
 }
 
 .auth-head {
@@ -1715,7 +1761,6 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 
-  .profile-panel,
   .plan-panel,
   .saved-panel {
     grid-column: span 12;
@@ -1849,7 +1894,8 @@ a {
   .topbar,
   .tab-bar,
   .auth-panel,
-  .profile-panel,
+  .profile-summary,
+  .profile-form-wrap,
   .saved-panel,
   .drill-library-panel,
   .stats-panel,

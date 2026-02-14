@@ -149,61 +149,73 @@
         <p id="appMessage" class="app-message" aria-live="polite"></p>
       </section>
 
-      <section class="panel profile-panel">
-        <h2>Your Profile</h2>
-        <form id="profileForm" class="form-stack">
-          <label>
-            Name
-            <input type="text" id="name" placeholder="Jordan Lee" required />
-          </label>
-
-          <label>
-            Handicap Level
-            <select id="handicap" required>
-              <option value="">Select handicap range</option>
-              <option value="Beginner (20+)">Beginner (20+)</option>
-              <option value="Intermediate (10-19)">Intermediate (10-19)</option>
-              <option value="Advanced (0-9)">Advanced (0-9)</option>
-            </select>
-          </label>
-
-          <label>
-            Primary Weakness
-            <select id="weakness" required>
-              <option value="">Select weakness</option>
-              <option value="Driving accuracy">Driving accuracy</option>
-              <option value="Approach consistency">Approach consistency</option>
-              <option value="Short game touch">Short game touch</option>
-              <option value="Putting confidence">Putting confidence</option>
-              <option value="Course management">Course management</option>
-            </select>
-          </label>
-
-          <div class="inline-fields">
-            <label>
-              Days / week
-              <input type="number" id="daysPerWeek" min="1" max="7" value="3" required />
-            </label>
-            <label>
-              Hours / session
-              <input type="number" id="hoursPerSession" min="0.5" max="6" step="0.5" value="1.5" required />
-            </label>
-          </div>
-
-          <label>
-            Notes or Constraints
-            <textarea id="notes" rows="3" placeholder="Example: only have access to range on weekdays"></textarea>
-          </label>
-
-          <div class="cta-row">
-            <button id="generateRoutineBtn" class="btn btn-primary" type="submit">Generate Routine</button>
-            <button id="clearProfileBtn" class="btn btn-outline" type="button">Clear</button>
-          </div>
-        </form>
-      </section>
-
       <section class="panel plan-panel">
         <h2 id="planPanelTitle">Generated Practice Routine</h2>
+
+        <div id="profileSummary" class="profile-summary hidden">
+          <div class="profile-summary-tags">
+            <span class="profile-tag" id="summaryName"></span>
+            <span class="profile-tag" id="summaryHandicap"></span>
+            <span class="profile-tag" id="summaryWeakness"></span>
+            <span class="profile-tag" id="summarySchedule"></span>
+          </div>
+          <div class="profile-summary-actions">
+            <button id="editProfileBtn" class="btn btn-outline btn-sm" type="button">Edit</button>
+            <button id="summaryGenerateBtn" class="btn btn-primary btn-sm" type="button">Generate Routine</button>
+          </div>
+        </div>
+
+        <div id="profileFormWrap" class="profile-form-wrap">
+          <form id="profileForm" class="form-stack">
+            <label>
+              Name
+              <input type="text" id="name" placeholder="Jordan Lee" required />
+            </label>
+
+            <label>
+              Handicap Level
+              <select id="handicap" required>
+                <option value="">Select handicap range</option>
+                <option value="Beginner (20+)">Beginner (20+)</option>
+                <option value="Intermediate (10-19)">Intermediate (10-19)</option>
+                <option value="Advanced (0-9)">Advanced (0-9)</option>
+              </select>
+            </label>
+
+            <label>
+              Primary Weakness
+              <select id="weakness" required>
+                <option value="">Select weakness</option>
+                <option value="Driving accuracy">Driving accuracy</option>
+                <option value="Approach consistency">Approach consistency</option>
+                <option value="Short game touch">Short game touch</option>
+                <option value="Putting confidence">Putting confidence</option>
+                <option value="Course management">Course management</option>
+              </select>
+            </label>
+
+            <div class="inline-fields">
+              <label>
+                Days / week
+                <input type="number" id="daysPerWeek" min="1" max="7" value="3" required />
+              </label>
+              <label>
+                Hours / session
+                <input type="number" id="hoursPerSession" min="0.5" max="6" step="0.5" value="1.5" required />
+              </label>
+            </div>
+
+            <label>
+              Notes or Constraints
+              <textarea id="notes" rows="3" placeholder="Example: only have access to range on weekdays"></textarea>
+            </label>
+
+            <div class="cta-row">
+              <button id="generateRoutineBtn" class="btn btn-primary" type="submit">Generate Routine</button>
+              <button id="clearProfileBtn" class="btn btn-outline" type="button">Clear</button>
+            </div>
+          </form>
+        </div>
         <div id="generatedRoutineView">
           <div class="panel-subsection generated-subsection">
             <h3>Rules Engine Plan</h3>
