@@ -63,6 +63,7 @@
           <span id="themeIcon">&#9788;</span>
         </button>
         <button id="loadDemoBtn" class="btn btn-outline" type="button">Load Demo Data</button>
+        <button id="topSignInBtn" class="btn btn-primary hidden" type="button">Sign In</button>
         <div id="userMenuWrap" class="user-menu-wrap hidden">
           <button id="userMenuBtn" class="btn btn-outline user-menu-btn" type="button" title="User menu">
             <span id="userAvatar" class="user-avatar">&#9679;</span>
@@ -152,6 +153,23 @@
       <section class="panel plan-panel">
         <h2 id="planPanelTitle">Generated Practice Routine</h2>
 
+        <div id="stepperBar" class="stepper-bar hidden">
+          <div class="stepper-step active" data-step="1">
+            <div class="stepper-circle">1</div>
+            <span class="stepper-label">Profile</span>
+          </div>
+          <div class="stepper-connector"></div>
+          <div class="stepper-step upcoming" data-step="2">
+            <div class="stepper-circle">2</div>
+            <span class="stepper-label">Generate</span>
+          </div>
+          <div class="stepper-connector"></div>
+          <div class="stepper-step upcoming" data-step="3">
+            <div class="stepper-circle">3</div>
+            <span class="stepper-label">Practice</span>
+          </div>
+        </div>
+
         <div id="profileSummary" class="profile-summary hidden">
           <div class="profile-summary-tags">
             <span class="profile-tag" id="summaryName"></span>
@@ -222,22 +240,28 @@
             <p class="plan-mode-note">Use your profile form to generate a personalized routine.</p>
           </div>
           <div id="routineEmptyState" class="empty-state">
-            Sign in, then fill out your profile to generate a training routine.
+            <span id="routineEmptyText">Fill out your profile to generate a training routine.</span>
             <div class="empty-state-actions">
+              <button id="emptyStateGenerateBtn" class="btn btn-primary hidden" type="button">Generate Routine</button>
               <button id="loadDemoBtnInline" class="btn btn-outline" type="button">Load Demo Data</button>
             </div>
           </div>
           <article id="routineCard" class="routine-card hidden">
             <div class="routine-header">
-              <div>
+              <div class="routine-header-info">
                 <p id="routineTitle" class="routine-title"></p>
                 <p id="routineMeta" class="routine-meta"></p>
               </div>
-              <div class="save-controls">
-                <input id="saveRoutineNameInput" type="text" placeholder="Save as (optional title)" />
-                <button id="saveRoutineBtn" class="btn btn-primary" type="button">Save to Profile</button>
-                <button id="exportPdfBtn" class="btn btn-outline" type="button">PDF</button>
-                <button id="exportIcalBtn" class="btn btn-outline" type="button">iCal</button>
+            </div>
+            <div class="routine-actions">
+              <input id="saveRoutineNameInput" type="text" placeholder="Save as (optional title)" />
+              <button id="saveRoutineBtn" class="btn btn-primary" type="button">Save to Profile</button>
+              <div class="export-menu-wrap">
+                <button id="exportMenuBtn" class="btn btn-outline" type="button">Export &#9662;</button>
+                <div id="exportMenuDropdown" class="export-menu-dropdown hidden">
+                  <button id="exportPdfBtn" class="btn btn-outline" type="button">Export PDF</button>
+                  <button id="exportIcalBtn" class="btn btn-outline" type="button">Export iCal</button>
+                </div>
               </div>
             </div>
             <div id="routineWeeks" class="routine-weeks"></div>
@@ -418,6 +442,36 @@
           <button id="confirmModalOk" class="btn btn-danger" type="button">Confirm</button>
           <button id="confirmModalCancel" class="btn btn-outline" type="button">Cancel</button>
         </div>
+      </div>
+    </div>
+
+    <!-- Auth Gate Modal -->
+    <div id="authGateModal" class="modal-overlay hidden" role="dialog" aria-modal="true" hidden>
+      <div class="modal-card auth-gate-card">
+        <button id="authGateClose" class="modal-close" type="button">&times;</button>
+        <h3 id="authGateTitle">Sign in to continue</h3>
+        <form id="authGateForm" class="form-stack">
+          <label id="authGateNameField" class="hidden">
+            Name
+            <input type="text" id="authGateName" placeholder="Jordan Lee" />
+          </label>
+          <label>
+            Email
+            <input type="email" id="authGateEmail" placeholder="you@example.com" required />
+          </label>
+          <label>
+            Password
+            <div class="password-field-wrap">
+              <input type="password" id="authGatePassword" placeholder="At least 8 characters" required />
+              <button type="button" class="password-toggle" data-target="authGatePassword" title="Show password">&#9673;</button>
+            </div>
+          </label>
+          <p id="authGateMessage" class="app-message" aria-live="polite"></p>
+          <div class="cta-row">
+            <button id="authGateSubmitBtn" class="btn btn-primary" type="submit">Login</button>
+            <button id="authGateToggleBtn" class="btn btn-outline" type="button">Register</button>
+          </div>
+        </form>
       </div>
     </div>
 

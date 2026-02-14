@@ -92,6 +92,24 @@ const reflectionTags = document.getElementById("reflectionTags");
 const reflectionSaveBtn = document.getElementById("reflectionSaveBtn");
 const reflectionSkipBtn = document.getElementById("reflectionSkipBtn");
 
+const authGateModal = document.getElementById("authGateModal");
+const authGateClose = document.getElementById("authGateClose");
+const authGateForm = document.getElementById("authGateForm");
+const authGateNameField = document.getElementById("authGateNameField");
+const authGateNameInput = document.getElementById("authGateName");
+const authGateEmailInput = document.getElementById("authGateEmail");
+const authGatePasswordInput = document.getElementById("authGatePassword");
+const authGateSubmitBtn = document.getElementById("authGateSubmitBtn");
+const authGateToggleBtn = document.getElementById("authGateToggleBtn");
+const authGateTitle = document.getElementById("authGateTitle");
+const authGateMessage = document.getElementById("authGateMessage");
+const topSignInBtn = document.getElementById("topSignInBtn");
+const stepperBar = document.getElementById("stepperBar");
+const routineEmptyText = document.getElementById("routineEmptyText");
+const emptyStateGenerateBtn = document.getElementById("emptyStateGenerateBtn");
+const exportMenuBtn = document.getElementById("exportMenuBtn");
+const exportMenuDropdown = document.getElementById("exportMenuDropdown");
+
 let currentRoutine = null;
 let currentUser = null;
 let savedRoutines = [];
@@ -102,6 +120,8 @@ let drillLibraryCache = null;
 let pendingReflection = null;
 const FREE_ROUTINE_LIMIT = 5;
 const ONBOARDING_ENABLED = false;
+let authGateCallback = null;
+let authGateRegisterMode = false;
 
 function setOverlayVisible(el, visible) {
   if (!el) return;
@@ -110,7 +130,7 @@ function setOverlayVisible(el, visible) {
 }
 
 function forceCloseBlockingOverlays() {
-  [onboardingOverlay, confirmModal, reflectionModal, drillModal].forEach((el) => {
+  [onboardingOverlay, confirmModal, reflectionModal, drillModal, authGateModal].forEach((el) => {
     setOverlayVisible(el, false);
   });
   localStorage.setItem("thegolfbuild_onboarded", "1");
@@ -176,11 +196,16 @@ document.addEventListener("click", (e) => {
 // ===== Escape Key for Modals =====
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
+    if (!authGateModal.classList.contains("hidden")) { closeAuthGate(); return; }
     if (!confirmModal.classList.contains("hidden")) { closeConfirmModal(); return; }
     if (!reflectionModal.classList.contains("hidden")) { closeReflectionModal(); return; }
     if (!drillModal.classList.contains("hidden")) { closeDrillModal(); return; }
     if (!userMenuDropdown.classList.contains("hidden")) {
       userMenuDropdown.classList.add("hidden");
+      return;
+    }
+    if (exportMenuDropdown && !exportMenuDropdown.classList.contains("hidden")) {
+      exportMenuDropdown.classList.add("hidden");
       return;
     }
     if (onboardingOverlay && !onboardingOverlay.classList.contains("hidden")) {
@@ -264,6 +289,211 @@ function filterDrills() {
   });
   drillResultCount.textContent = `${filtered.length} of ${drillLibraryCache.length} drills`;
   renderDrillLibrary(filtered);
+}
+
+// ===== Auth Gate Modal =====
+function requireAuth(label, callback) {
+  if (currentUser) {
+    callback();
+    return;
+  }
+  authGateCallback = callback;
+  authGateTitle.textContent = label || "Sign in to continue";
+  authGateMessage.textContent = "";
+  authGateRegisterMode = false;
+  updateAuthGateMode();
+  setOverlayVisible(authGateModal, true);
+}
+
+function updateAuthGateMode() {
+  authGateNameField.classList.toggle("hidden", !authGateRegisterMode);
+  authGateNameInput.required = authGateRegisterMode;
+  authGateSubmitBtn.textContent = authGateRegisterMode ? "Create Account" : "Login";
+  authGateToggleBtn.textContent = authGateRegisterMode ? "Back to Login" : "Register";
+}
+
+function closeAuthGate() {
+  setOverlayVisible(authGateModal, false);
+  authGateCallback = null;
+  authGateForm.reset();
+  authGateMessage.textContent = "";
+}
+
+authGateClose.addEventListener("click", closeAuthGate);
+authGateModal.addEventListener("click", (e) => {
+  if (e.target === authGateModal) closeAuthGate();
+});
+
+authGateToggleBtn.addEventListener("click", () => {
+  authGateRegisterMode = !authGateRegisterMode;
+  updateAuthGateMode();
+});
+
+authGateForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const email = authGateEmailInput.value.trim();
+  const password = authGatePasswordInput.value;
+  const name = authGateNameInput.value.trim();
+
+  if (!email || !password) {
+    authGateMessage.textContent = "Enter email and password.";
+    authGateMessage.classList.add("error");
+    return;
+  }
+  if (authGateRegisterMode && !name) {
+    authGateMessage.textContent = "Enter your name to register.";
+    authGateMessage.classList.add("error");
+    return;
+  }
+
+  authGateSubmitBtn.disabled = true;
+  authGateSubmitBtn.textContent = authGateRegisterMode ? "Creating..." : "Logging in...";
+  try {
+    const endpoint = authGateRegisterMode ? "/api/auth/register" : "/api/auth/login";
+    const body = authGateRegisterMode
+      ? JSON.stringify({ name, email, password })
+      : JSON.stringify({ email, password });
+    const result = await api(endpoint, { method: "POST", body });
+
+    setToken(result.token);
+    currentUser = result.user;
+    updateAuthUi();
+    await loadUserData();
+    showToast(authGateRegisterMode ? "Account created." : "Logged in successfully.");
+
+    const cb = authGateCallback;
+    closeAuthGate();
+    if (cb) cb();
+  } catch (err) {
+    authGateMessage.textContent = err.message;
+    authGateMessage.classList.add("error");
+  } finally {
+    authGateSubmitBtn.disabled = false;
+    updateAuthGateMode();
+  }
+});
+
+topSignInBtn.addEventListener("click", () => {
+  requireAuth("Sign in", () => {});
+});
+
+// ===== Export Dropdown =====
+exportMenuBtn.addEventListener("click", (e) => {
+  e.stopPropagation();
+  exportMenuDropdown.classList.toggle("hidden");
+});
+
+document.addEventListener("click", (e) => {
+  if (exportMenuDropdown && !exportMenuDropdown.classList.contains("hidden")) {
+    const wrap = exportMenuBtn.parentElement;
+    if (!wrap.contains(e.target)) {
+      exportMenuDropdown.classList.add("hidden");
+    }
+  }
+});
+
+// ===== Stepper Bar =====
+function updateStepper() {
+  if (!stepperBar) return;
+
+  const isAuthed = Boolean(currentUser);
+  const isGeneratedTab = activePlanMode === "generated";
+
+  if (!isAuthed || !isGeneratedTab) {
+    stepperBar.classList.add("hidden");
+    return;
+  }
+
+  stepperBar.classList.remove("hidden");
+
+  const profile = getProfileFromForm();
+  const hasProfile = isProfileComplete(profile);
+  const hasRoutine = Boolean(currentRoutine);
+
+  let currentStep;
+  if (hasRoutine) currentStep = 3;
+  else if (hasProfile) currentStep = 2;
+  else currentStep = 1;
+
+  const steps = stepperBar.querySelectorAll(".stepper-step");
+  const connectors = stepperBar.querySelectorAll(".stepper-connector");
+
+  steps.forEach((stepEl) => {
+    const stepNum = Number(stepEl.dataset.step);
+    stepEl.classList.remove("active", "completed", "upcoming");
+    if (stepNum < currentStep) stepEl.classList.add("completed");
+    else if (stepNum === currentStep) stepEl.classList.add("active");
+    else stepEl.classList.add("upcoming");
+  });
+
+  connectors.forEach((conn, i) => {
+    conn.classList.toggle("completed", i + 1 < currentStep);
+  });
+
+  // Update empty state text based on stepper state
+  if (currentStep === 2 && !hasRoutine) {
+    routineEmptyText.textContent = "Your profile is ready. Generate a personalized routine!";
+    emptyStateGenerateBtn.classList.remove("hidden");
+  } else if (currentStep === 1) {
+    routineEmptyText.textContent = "Fill out your profile to generate a training routine.";
+    emptyStateGenerateBtn.classList.add("hidden");
+  } else {
+    emptyStateGenerateBtn.classList.add("hidden");
+  }
+}
+
+// Stepper click navigation
+stepperBar.addEventListener("click", (e) => {
+  const stepEl = e.target.closest(".stepper-step");
+  if (!stepEl) return;
+  const stepNum = Number(stepEl.dataset.step);
+
+  if (stepNum === 1) {
+    expandProfileForm();
+    document.getElementById("name").focus();
+  } else if (stepNum === 2) {
+    const profile = getProfileFromForm();
+    if (isProfileComplete(profile)) {
+      profileForm.requestSubmit();
+    } else {
+      showToast("Complete your profile first.", true);
+    }
+  } else if (stepNum === 3) {
+    if (routineCard && !routineCard.classList.contains("hidden")) {
+      routineCard.scrollIntoView({ behavior: "smooth" });
+    }
+  }
+});
+
+emptyStateGenerateBtn.addEventListener("click", () => {
+  profileForm.requestSubmit();
+});
+
+// ===== Sample Stats for Logged-Out Users =====
+function renderSampleStats() {
+  const statsContent = document.getElementById("statsContent");
+  statsContent.innerHTML = "";
+
+  const banner = document.createElement("div");
+  banner.className = "stats-sample-banner";
+  banner.innerHTML = '<span>Sample data shown. Sign in to see your real stats.</span>';
+  const signInBtn = document.createElement("button");
+  signInBtn.className = "btn btn-primary btn-sm";
+  signInBtn.textContent = "Sign In";
+  signInBtn.addEventListener("click", () => requireAuth("Sign in to view your stats", () => loadStats()));
+  banner.appendChild(signInBtn);
+  statsContent.appendChild(banner);
+
+  // Render hardcoded sample data
+  statsContent.innerHTML += `
+    <div class="stats-grid">
+      <div class="stat-card"><p class="stat-value" style="color:var(--green)">3</p><p class="stat-label">Routines Saved</p></div>
+      <div class="stat-card"><p class="stat-value" style="color:var(--green)">12</p><p class="stat-label">Sessions Completed</p></div>
+      <div class="stat-card"><p class="stat-value" style="color:var(--green)">5d</p><p class="stat-label">Current Streak</p></div>
+      <div class="stat-card"><p class="stat-value" style="color:var(--green)">8d</p><p class="stat-label">Longest Streak</p></div>
+    </div>
+    <div class="stats-detail"><h3>Session Progress</h3><div class="progress-bar-wrap"><div class="progress-bar" style="width:50%"></div></div><p class="stat-progress-text">12 / 24 sessions (50%)</p></div>
+  `;
 }
 
 // ===== Skeleton Helpers =====
@@ -650,6 +880,7 @@ function setPlanMode(mode) {
     showGeneratedRoutineBtn.classList.add("active");
     planPanelTitle.textContent = "Generated Practice Routine";
   }
+  updateStepper();
 }
 
 function getProfileFromForm() {
@@ -689,6 +920,7 @@ function renderProfileSummary(profile) {
     (profile.daysPerWeek || 3) + "d/wk \u00B7 " + (profile.hoursPerSession || 1.5) + "h";
   profileSummary.classList.remove("hidden");
   profileFormWrap.classList.add("collapsed");
+  updateStepper();
 }
 
 function expandProfileForm() {
@@ -698,7 +930,7 @@ function expandProfileForm() {
 
 function lockPlanner(locked) {
   const fields = document.querySelectorAll(
-    "#profileForm input, #profileForm select, #profileForm textarea, #profileForm button, #customRoutineForm input, #customRoutineForm textarea, #customRoutineForm button"
+    "#profileForm input, #profileForm select, #profileForm textarea, #profileForm button"
   );
   fields.forEach((field) => {
     field.disabled = locked;
@@ -706,10 +938,6 @@ function lockPlanner(locked) {
 
   saveRoutineBtn.disabled = locked;
   saveRoutineNameInput.disabled = locked;
-  loadDemoBtn.disabled = locked;
-  showGeneratedRoutineBtn.disabled = locked;
-  showCustomRoutineBtn.disabled = locked;
-  showSavedBtn.disabled = locked;
   upgradeBtn.disabled = locked;
 
   if (locked) {
@@ -717,16 +945,15 @@ function lockPlanner(locked) {
     savedList.innerHTML = "";
     savedEmptyState.classList.remove("hidden");
     savedEmptyState.textContent = "Sign in to view and save routines.";
-    routineEmptyState.textContent = "Sign in, then fill out your profile to generate a training routine.";
+    routineEmptyText.textContent = "Fill out your profile to generate a training routine.";
   } else {
     savedEmptyState.textContent = "No routines saved yet.";
-    routineEmptyState.textContent = "Fill out your profile to generate a training routine.";
+    routineEmptyText.textContent = "Fill out your profile to generate a training routine.";
   }
 
   if (locked) {
     isGeneratingRoutine = false;
     generateRoutineBtn.textContent = "Generate Routine";
-    setPlanMode("generated");
   }
 }
 
@@ -1027,6 +1254,7 @@ function renderRoutine(routine) {
   routineEmptyState.classList.add("hidden");
   saveRoutineNameInput.value = routine.title || "";
   saveRoutineNameInput.placeholder = `Save as (optional title) • ${routine.title}`;
+  updateStepper();
 }
 
 async function toggleCompletion(routineId, key, weekIndex, weekTotal) {
@@ -1155,14 +1383,16 @@ async function loadUserData() {
   renderSavedRoutines();
   currentRoutine = null;
   renderRoutine(null);
+  updateStepper();
 }
 
 function updateAuthUi() {
   const isAuthed = Boolean(currentUser);
   authStatus.textContent = isAuthed ? `Signed in as ${currentUser.name}` : "Not signed in";
   setAuthMode(isAuthed ? false : isRegisterMode);
-  authPanel.classList.toggle("hidden", isAuthed);
+  authPanel.classList.add("hidden");
   userMenuWrap.classList.toggle("hidden", !isAuthed);
+  topSignInBtn.classList.toggle("hidden", isAuthed);
   loadDemoBtn.classList.toggle("hidden", isAuthed);
   if (isAuthed) {
     userMenuName.textContent = getDisplayFirstName();
@@ -1173,6 +1403,7 @@ function updateAuthUi() {
   }
   lockPlanner(!isAuthed);
   renderUsage();
+  updateStepper();
 }
 
 async function register() {
@@ -1251,6 +1482,7 @@ async function logout() {
   renderRoutine(null);
   renderSavedRoutines();
   updateAuthUi();
+  updateStepper();
   setMessage("Logged out.");
 }
 
@@ -1378,19 +1610,21 @@ authForm.addEventListener("submit", async (event) => {
 
   await login();
 });
-upgradeBtn.addEventListener("click", async () => {
-  try {
-    const res = await api("/api/billing/upgrade-pro", { method: "POST" });
-    currentUser = res.user;
-    updateAuthUi();
-    renderSavedRoutines();
-    setMessage("Upgrade complete. You now have unlimited routine saves.");
-  } catch (err) {
-    setMessage(err.message, true);
-  }
+upgradeBtn.addEventListener("click", () => {
+  requireAuth("Sign in to upgrade", async () => {
+    try {
+      const res = await api("/api/billing/upgrade-pro", { method: "POST" });
+      currentUser = res.user;
+      updateAuthUi();
+      renderSavedRoutines();
+      setMessage("Upgrade complete. You now have unlimited routine saves.");
+    } catch (err) {
+      setMessage(err.message, true);
+    }
+  });
 });
 
-profileForm.addEventListener("submit", async (event) => {
+profileForm.addEventListener("submit", (event) => {
   event.preventDefault();
   if (isGeneratingRoutine) return;
 
@@ -1400,63 +1634,68 @@ profileForm.addEventListener("submit", async (event) => {
     return;
   }
 
-  try {
-    isGeneratingRoutine = true;
-    generateRoutineBtn.disabled = true;
-    generateRoutineBtn.textContent = "Generating...";
-    setMessage("Generating your routine...");
+  requireAuth("Sign in to generate a routine", async () => {
+    try {
+      isGeneratingRoutine = true;
+      generateRoutineBtn.disabled = true;
+      generateRoutineBtn.textContent = "Generating...";
+      setMessage("Generating your routine...");
 
-    const profile = getProfileFromForm();
-    await api("/api/profile", {
-      method: "PUT",
-      body: JSON.stringify({ profile })
-    });
-    setCachedProfile(currentUser?.id, profile);
+      const profile = getProfileFromForm();
+      await api("/api/profile", {
+        method: "PUT",
+        body: JSON.stringify({ profile })
+      });
+      setCachedProfile(currentUser?.id, profile);
 
-    const generation = await api("/api/routines/generate", {
-      method: "POST",
-      body: JSON.stringify({ profile })
-    });
-    currentRoutine = generation.routine;
-    renderRoutine(currentRoutine);
-    renderProfileSummary(profile);
-    setMessage("Routine generated with smart rules engine. Save it when ready.");
-  } catch (err) {
-    setMessage(err.message, true);
-  } finally {
-    isGeneratingRoutine = false;
-    generateRoutineBtn.disabled = false;
-    generateRoutineBtn.textContent = "Generate Routine";
-  }
+      const generation = await api("/api/routines/generate", {
+        method: "POST",
+        body: JSON.stringify({ profile })
+      });
+      currentRoutine = generation.routine;
+      renderRoutine(currentRoutine);
+      renderProfileSummary(profile);
+      updateStepper();
+      setMessage("Routine generated with smart rules engine. Save it when ready.");
+    } catch (err) {
+      setMessage(err.message, true);
+    } finally {
+      isGeneratingRoutine = false;
+      generateRoutineBtn.disabled = false;
+      generateRoutineBtn.textContent = "Generate Routine";
+    }
+  });
 });
 
-saveRoutineBtn.addEventListener("click", async () => {
+saveRoutineBtn.addEventListener("click", () => {
   if (!currentRoutine) return;
 
-  try {
-    const customSaveName = saveRoutineNameInput.value.trim();
-    const routineToSave = customSaveName
-      ? { ...currentRoutine, title: customSaveName }
-      : currentRoutine;
+  requireAuth("Sign in to save routines", async () => {
+    try {
+      const customSaveName = saveRoutineNameInput.value.trim();
+      const routineToSave = customSaveName
+        ? { ...currentRoutine, title: customSaveName }
+        : currentRoutine;
 
-    const result = await api("/api/routines", {
-      method: "POST",
-      body: JSON.stringify({ routine: routineToSave })
-    });
+      const result = await api("/api/routines", {
+        method: "POST",
+        body: JSON.stringify({ routine: routineToSave })
+      });
 
-    savedRoutines = [result.routine, ...savedRoutines];
-    currentRoutine = result.routine;
-    renderSavedRoutines();
-    renderRoutine(currentRoutine);
-    setMessage("Routine saved to your profile.");
-  } catch (err) {
-    if (err.code === "UPGRADE_REQUIRED") {
-      setMessage("You reached 5 total saved routines (generated + custom). Upgrade to Pro for unlimited.", true);
-      return;
+      savedRoutines = [result.routine, ...savedRoutines];
+      currentRoutine = result.routine;
+      renderSavedRoutines();
+      renderRoutine(currentRoutine);
+      setMessage("Routine saved to your profile.");
+    } catch (err) {
+      if (err.code === "UPGRADE_REQUIRED") {
+        setMessage("You reached 5 total saved routines (generated + custom). Upgrade to Pro for unlimited.", true);
+        return;
+      }
+
+      setMessage(err.message, true);
     }
-
-    setMessage(err.message, true);
-  }
+  });
 });
 
 editProfileBtn.addEventListener("click", () => {
@@ -1617,7 +1856,7 @@ function renderDrillLibrary(drills) {
 // Performance Dashboard
 async function loadStats() {
   if (!currentUser) {
-    document.getElementById("statsContent").innerHTML = '<p class="empty-state">Sign in to view your stats.</p>';
+    renderSampleStats();
     return;
   }
   const statsContent = document.getElementById("statsContent");
@@ -1841,14 +2080,16 @@ exportIcalBtn.addEventListener("click", () => {
 customRoutineForm.addEventListener("submit", (event) => {
   event.preventDefault();
 
-  try {
-    currentRoutine = buildCustomRoutine();
-    renderRoutine(currentRoutine);
-    saveRoutineNameInput.value = currentRoutine.title;
-    setMessage("Custom routine created. Save it to your profile.");
-  } catch (err) {
-    setMessage(err.message, true);
-  }
+  requireAuth("Sign in to create custom routines", () => {
+    try {
+      currentRoutine = buildCustomRoutine();
+      renderRoutine(currentRoutine);
+      saveRoutineNameInput.value = currentRoutine.title;
+      setMessage("Custom routine created. Save it to your profile.");
+    } catch (err) {
+      setMessage(err.message, true);
+    }
+  });
 });
 
 // Onboarding
