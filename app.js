@@ -161,6 +161,10 @@ document.addEventListener("keydown", (e) => {
     if (!confirmModal.classList.contains("hidden")) { closeConfirmModal(); return; }
     if (!reflectionModal.classList.contains("hidden")) { closeReflectionModal(); return; }
     if (!drillModal.classList.contains("hidden")) { closeDrillModal(); return; }
+    if (!userMenuDropdown.classList.contains("hidden")) {
+      userMenuDropdown.classList.add("hidden");
+      return;
+    }
     if (!onboardingOverlay.classList.contains("hidden")) {
       onboardingOverlay.classList.add("hidden");
       localStorage.setItem("thegolfbuild_onboarded", "1");
@@ -1826,6 +1830,9 @@ function initOnboarding() {
   });
 
   skipBtn.addEventListener("click", closeOnboarding);
+  onboardingOverlay.addEventListener("click", (event) => {
+    if (event.target === onboardingOverlay) closeOnboarding();
+  });
 
   function closeOnboarding() {
     onboardingOverlay.classList.add("hidden");
