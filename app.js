@@ -1808,11 +1808,22 @@ function initOnboarding() {
   if (localStorage.getItem(key)) return;
 
   onboardingOverlay.classList.remove("hidden");
+  function closeOnboarding() {
+    onboardingOverlay.classList.add("hidden");
+    localStorage.setItem(key, "1");
+  }
+
   let step = 0;
   const steps = onboardingOverlay.querySelectorAll(".onboarding-step");
   const dots = onboardingOverlay.querySelectorAll(".onboarding-dot");
   const nextBtn = document.getElementById("onboardingNext");
   const skipBtn = document.getElementById("onboardingSkip");
+  const closeBtn = document.getElementById("onboardingClose");
+
+  if (!nextBtn || !skipBtn || !closeBtn || !steps.length || !dots.length) {
+    closeOnboarding();
+    return;
+  }
 
   function showStep(n) {
     steps.forEach((s, i) => s.classList.toggle("active", i === n));
@@ -1830,14 +1841,10 @@ function initOnboarding() {
   });
 
   skipBtn.addEventListener("click", closeOnboarding);
+  closeBtn.addEventListener("click", closeOnboarding);
   onboardingOverlay.addEventListener("click", (event) => {
     if (event.target === onboardingOverlay) closeOnboarding();
   });
-
-  function closeOnboarding() {
-    onboardingOverlay.classList.add("hidden");
-    localStorage.setItem(key, "1");
-  }
 }
 
 (async function init() {
