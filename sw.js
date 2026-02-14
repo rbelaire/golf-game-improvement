@@ -1,4 +1,4 @@
-const CACHE_NAME = "golfbuild-v3";
+const CACHE_NAME = "golfbuild-v4";
 const STATIC_ASSETS = [
   "/",
   "/index.html",
@@ -31,6 +31,11 @@ self.addEventListener("fetch", (event) => {
 
   // Network-first for API calls
   if (url.pathname.startsWith("/api/")) {
+    // Never cache auth endpoints — stale auth responses cause false logouts
+    if (url.pathname.startsWith("/api/auth/")) {
+      event.respondWith(fetch(event.request));
+      return;
+    }
     event.respondWith(
       fetch(event.request)
         .then((response) => {

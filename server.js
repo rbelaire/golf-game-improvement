@@ -3,6 +3,20 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 
+// Load .env file if present (no external dependency)
+const envPath = path.join(__dirname, ".env");
+if (fs.existsSync(envPath)) {
+  for (const line of fs.readFileSync(envPath, "utf8").split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const eq = trimmed.indexOf("=");
+    if (eq === -1) continue;
+    const key = trimmed.slice(0, eq).trim();
+    const val = trimmed.slice(eq + 1).trim();
+    if (!process.env[key]) process.env[key] = val;
+  }
+}
+
 const db = require("./lib/db");
 const { buildRulesRoutine, validateProfileShape, normalizeProfile, DRILL_LIBRARY } = require("./lib/drills");
 const { createRateLimiter } = require("./lib/rate-limit");

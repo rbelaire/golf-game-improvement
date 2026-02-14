@@ -658,6 +658,7 @@ reflectionSaveBtn.addEventListener("click", async () => {
       if (!savedRoutines[idx].reflections) savedRoutines[idx].reflections = {};
       savedRoutines[idx].reflections[key] = reflection;
     }
+    setCachedRoutines(currentUser?.id, savedRoutines);
     if (currentRoutine?.id === routineId) {
       if (!currentRoutine.reflections) currentRoutine.reflections = {};
       currentRoutine.reflections[key] = reflection;
@@ -740,6 +741,29 @@ function setCachedProfile(userId, profile) {
 function clearCachedProfile(userId) {
   if (!userId) return;
   localStorage.removeItem(profileCacheKey(userId));
+}
+
+function routinesCacheKey(userId) {
+  return `thegolfbuild_routines_${userId}`;
+}
+
+function getCachedRoutines(userId) {
+  if (!userId) return null;
+  try {
+    const raw = localStorage.getItem(routinesCacheKey(userId));
+    return raw ? JSON.parse(raw) : null;
+  } catch (_err) {
+    return null;
+  }
+}
+
+function setCachedRoutines(userId, routines) {
+  if (!userId) return;
+  try {
+    localStorage.setItem(routinesCacheKey(userId), JSON.stringify(routines || []));
+  } catch (_err) {
+    // localStorage quota exceeded — ignore
+  }
 }
 
 function getToken() {
@@ -1270,6 +1294,7 @@ async function toggleCompletion(routineId, key, weekIndex, weekTotal) {
     const updated = result.routine;
     const idx = savedRoutines.findIndex((r) => r.id === routineId);
     if (idx !== -1) savedRoutines[idx] = updated;
+    setCachedRoutines(currentUser?.id, savedRoutines);
     if (currentRoutine?.id === routineId) {
       currentRoutine = updated;
       renderRoutine(currentRoutine);
@@ -1357,6 +1382,7 @@ function renderSavedRoutines() {
         try {
           await api(`/api/routines/${routine.id}`, { method: "DELETE" });
           savedRoutines = savedRoutines.filter((item) => item.id !== routine.id);
+          setCachedRoutines(currentUser?.id, savedRoutines);
           renderSavedRoutines();
 
           if (currentRoutine?.id === routine.id) {
@@ -1379,7 +1405,14 @@ async function loadUserData() {
   hydrateForm(profile);
   renderProfileSummary(profile);
   setCachedProfile(currentUser.id, profile);
-  savedRoutines = routineRes.routines || [];
+  const serverRoutines = routineRes.routines || [];
+  // If server lost routines (e.g. ephemeral storage cold start), restore from local cache
+  if (serverRoutines.length === 0) {
+    savedRoutines = getCachedRoutines(currentUser.id) || [];
+  } else {
+    savedRoutines = serverRoutines;
+    setCachedRoutines(currentUser.id, serverRoutines);
+  }
   renderSavedRoutines();
   currentRoutine = null;
   renderRoutine(null);
@@ -1684,6 +1717,7 @@ saveRoutineBtn.addEventListener("click", () => {
 
       savedRoutines = [result.routine, ...savedRoutines];
       currentRoutine = result.routine;
+      setCachedRoutines(currentUser?.id, savedRoutines);
       renderSavedRoutines();
       renderRoutine(currentRoutine);
       setMessage("Routine saved to your profile.");
@@ -2155,9 +2189,12 @@ function initOnboarding() {
     updateAuthUi();
     await loadUserData();
     setMessage("Session restored.");
-  } catch (_err) {
-    clearToken();
-    currentUser = null;
-    updateAuthUi();
+  } catch (err) {
+    // Only clear session on genuine auth failure (handled by api() 401 logic).
+    // Network errors or server errors should not log the user out — keep
+    // the token so the next navigation/action can retry.
+    if (!currentUser) {
+      updateAuthUi();
+    }
   }
 })();
