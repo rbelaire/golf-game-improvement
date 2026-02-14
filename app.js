@@ -99,6 +99,13 @@ let pendingReflection = null;
 const FREE_ROUTINE_LIMIT = 5;
 const ONBOARDING_ENABLED = false;
 
+function forceCloseBlockingOverlays() {
+  [onboardingOverlay, confirmModal, reflectionModal, drillModal].forEach((el) => {
+    if (el) el.classList.add("hidden");
+  });
+  localStorage.setItem("thegolfbuild_onboarded", "1");
+}
+
 // ===== Theme Toggle =====
 function initTheme() {
   const saved = localStorage.getItem("thegolfbuild_theme") || "dark";
@@ -1853,6 +1860,8 @@ function initOnboarding() {
 }
 
 (async function init() {
+  forceCloseBlockingOverlays();
+  setTimeout(forceCloseBlockingOverlays, 1200);
   initOnboarding();
   setPlanMode("generated");
   updateAuthUi();
