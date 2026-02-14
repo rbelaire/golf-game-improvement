@@ -1866,8 +1866,6 @@ function initOnboarding() {
 }
 
 (async function init() {
-  forceCloseBlockingOverlays();
-  setTimeout(forceCloseBlockingOverlays, 1200);
   initOnboarding();
   setPlanMode("generated");
   updateAuthUi();

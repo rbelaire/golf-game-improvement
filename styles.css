@@ -578,7 +578,7 @@ button:disabled {
 }
 
 .hidden {
-  display: none;
+  display: none !important;
 }
 
 /* ===== Routine Card & Session Cards ===== */
