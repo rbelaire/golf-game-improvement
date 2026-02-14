@@ -1,4 +1,4 @@
-const CACHE_NAME = "golfbuild-v2";
+const CACHE_NAME = "golfbuild-v3";
 const STATIC_ASSETS = [
   "/",
   "/index.html",
@@ -7,6 +7,7 @@ const STATIC_ASSETS = [
   "/favicon.svg",
   "/manifest.webmanifest"
 ];
+const APP_SHELL_PATHS = new Set(["/", "/index.html", "/app.js", "/styles.css", "/manifest.webmanifest"]);
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -26,6 +27,7 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
+  if (event.request.method !== "GET") return;
 
   // Network-first for API calls
   if (url.pathname.startsWith("/api/")) {
@@ -33,6 +35,22 @@ self.addEventListener("fetch", (event) => {
       fetch(event.request)
         .then((response) => {
           if (response.ok && event.request.method === "GET") {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          }
+          return response;
+        })
+        .catch(() => caches.match(event.request))
+    );
+    return;
+  }
+
+  // Network-first for core app shell files to avoid stale UI lock bugs
+  if (APP_SHELL_PATHS.has(url.pathname)) {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          if (response.ok) {
             const clone = response.clone();
             caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
           }

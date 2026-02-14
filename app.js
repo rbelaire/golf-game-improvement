@@ -97,6 +97,7 @@ let activePlanMode = "generated";
 let drillLibraryCache = null;
 let pendingReflection = null;
 const FREE_ROUTINE_LIMIT = 5;
+const ONBOARDING_ENABLED = false;
 
 // ===== Theme Toggle =====
 function initTheme() {
@@ -165,7 +166,7 @@ document.addEventListener("keydown", (e) => {
       userMenuDropdown.classList.add("hidden");
       return;
     }
-    if (!onboardingOverlay.classList.contains("hidden")) {
+    if (onboardingOverlay && !onboardingOverlay.classList.contains("hidden")) {
       onboardingOverlay.classList.add("hidden");
       localStorage.setItem("thegolfbuild_onboarded", "1");
     }
@@ -1805,6 +1806,10 @@ customRoutineForm.addEventListener("submit", (event) => {
 // Onboarding
 function initOnboarding() {
   const key = "thegolfbuild_onboarded";
+  if (!ONBOARDING_ENABLED || !onboardingOverlay) {
+    localStorage.setItem(key, "1");
+    return;
+  }
   if (localStorage.getItem(key)) return;
 
   onboardingOverlay.classList.remove("hidden");
