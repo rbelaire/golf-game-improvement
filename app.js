@@ -45,24 +45,23 @@ const confirmModalMessage = document.getElementById("confirmModalMessage");
 const confirmModalOk = document.getElementById("confirmModalOk");
 const confirmModalCancel = document.getElementById("confirmModalCancel");
 
-const showSavedBtn = document.getElementById("showSavedBtn");
-const savedPanel = document.querySelector(".saved-panel");
 const drillSearchInput = document.getElementById("drillSearchInput");
 const drillResultCount = document.getElementById("drillResultCount");
 const saveRoutineBtn = document.getElementById("saveRoutineBtn");
-const saveRoutineNameInput = document.getElementById("saveRoutineNameInput");
+const routineTitleInput = document.getElementById("routineTitle");
 const upgradeBtn = document.getElementById("upgradeBtn");
 const usageText = document.getElementById("usageText");
 
 const routineEmptyState = document.getElementById("routineEmptyState");
 const routineCard = document.getElementById("routineCard");
-const routineTitle = document.getElementById("routineTitle");
 const routineMeta = document.getElementById("routineMeta");
 const routineWeeks = document.getElementById("routineWeeks");
 
-const savedEmptyState = document.getElementById("savedEmptyState");
-const savedList = document.getElementById("savedList");
-const savedRoutineTemplate = document.getElementById("savedRoutineTemplate");
+const routineSwitcherModal = document.getElementById("routineSwitcherModal");
+const switcherModalClose = document.getElementById("switcherModalClose");
+const switcherEmptyState = document.getElementById("switcherEmptyState");
+const switcherList = document.getElementById("switcherList");
+const changeRoutineBtn = document.getElementById("changeRoutineBtn");
 
 const showDrillLibraryBtn = document.getElementById("showDrillLibraryBtn");
 const showStatsBtn = document.getElementById("showStatsBtn");
@@ -141,7 +140,7 @@ function setOverlayVisible(el, visible) {
 }
 
 function forceCloseBlockingOverlays() {
-  [onboardingOverlay, confirmModal, reflectionModal, drillModal, authGateModal].forEach((el) => {
+  [onboardingOverlay, confirmModal, reflectionModal, drillModal, authGateModal, routineSwitcherModal].forEach((el) => {
     setOverlayVisible(el, false);
   });
   localStorage.setItem("thegolfbuild_onboarded", "1");
@@ -208,6 +207,7 @@ document.addEventListener("click", (e) => {
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     if (!authGateModal.classList.contains("hidden")) { closeAuthGate(); return; }
+    if (!routineSwitcherModal.classList.contains("hidden")) { closeRoutineSwitcher(); return; }
     if (!confirmModal.classList.contains("hidden")) { closeConfirmModal(); return; }
     if (!reflectionModal.classList.contains("hidden")) { closeReflectionModal(); return; }
     if (!drillModal.classList.contains("hidden")) { closeDrillModal(); return; }
@@ -238,35 +238,6 @@ document.querySelectorAll(".password-toggle").forEach((btn) => {
   });
 });
 
-// ===== Saved Routines Sort =====
-let savedSortMode = "newest";
-
-document.querySelectorAll(".sort-btn").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll(".sort-btn").forEach((b) => b.classList.remove("active"));
-    btn.classList.add("active");
-    savedSortMode = btn.dataset.sort;
-    renderSavedRoutines();
-  });
-});
-
-function getSortedRoutines() {
-  const sorted = [...savedRoutines];
-  switch (savedSortMode) {
-    case "oldest":
-      sorted.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-      break;
-    case "name":
-      sorted.sort((a, b) => (a.title || "").localeCompare(b.title || ""));
-      break;
-    case "progress":
-      sorted.sort((a, b) => routineProgress(b).pct - routineProgress(a).pct);
-      break;
-    default:
-      sorted.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  }
-  return sorted;
-}
 
 // ===== Drill Search & Filter =====
 let activeDrillFilters = { type: null, level: null };
@@ -885,7 +856,6 @@ function setPlanMode(mode) {
   customRoutineView.classList.add("hidden");
   drillLibraryPanel.classList.add("hidden");
   statsPanel.classList.add("hidden");
-  savedPanel.classList.add("hidden");
   planPanel.classList.add("hidden");
 
   showHomeBtn.classList.remove("active");
@@ -893,7 +863,6 @@ function setPlanMode(mode) {
   showCustomRoutineBtn.classList.remove("active");
   showDrillLibraryBtn.classList.remove("active");
   showStatsBtn.classList.remove("active");
-  showSavedBtn.classList.remove("active");
 
   if (mode === "home") {
     homePanel.classList.remove("hidden");
@@ -913,9 +882,6 @@ function setPlanMode(mode) {
     statsPanel.classList.remove("hidden");
     showStatsBtn.classList.add("active");
     loadStats();
-  } else if (mode === "saved") {
-    savedPanel.classList.remove("hidden");
-    showSavedBtn.classList.add("active");
   } else {
     planPanel.classList.remove("hidden");
     generatedRoutineView.classList.remove("hidden");
@@ -970,7 +936,7 @@ function renderHomeDashboard() {
         currentRoutine = activeRoutine;
         renderRoutine(currentRoutine);
         hydrateForm(activeRoutine.profileSnapshot);
-        saveRoutineNameInput.value = activeRoutine.title || "";
+        routineTitleInput.value = activeRoutine.title || "";
         setPlanMode("generated");
       });
       homeActiveRoutineCard.appendChild(card);
@@ -1057,17 +1023,13 @@ function lockPlanner(locked) {
   });
 
   saveRoutineBtn.disabled = locked;
-  saveRoutineNameInput.disabled = locked;
+  routineTitleInput.disabled = locked;
   upgradeBtn.disabled = locked;
 
   if (locked) {
     renderRoutine(null);
-    savedList.innerHTML = "";
-    savedEmptyState.classList.remove("hidden");
-    savedEmptyState.textContent = "Sign in to view and save routines.";
     routineEmptyText.textContent = "Fill out your profile to generate a training routine.";
   } else {
-    savedEmptyState.textContent = "No routines saved yet.";
     routineEmptyText.textContent = "Fill out your profile to generate a training routine.";
   }
 
@@ -1194,7 +1156,7 @@ function generateRoutine(profile) {
   const weaknessLabel = weaknesses.join(" & ") || "General";
   return {
     profileSnapshot: profile,
-    title: `${profile.name}'s 4-Week ${weaknessLabel} Plan`,
+    title: `4-Week ${weaknessLabel} Plan`,
     meta: `${profile.handicap} • ${profile.daysPerWeek} days/week • ${profile.hoursPerSession} hr/session`,
     weeks
   };
@@ -1220,11 +1182,11 @@ function renderRoutine(routine) {
     routineCard.classList.add("hidden");
     routineEmptyState.classList.remove("hidden");
     routineWeeks.innerHTML = "";
-    saveRoutineNameInput.value = "";
+    routineTitleInput.value = "";
     return;
   }
 
-  routineTitle.textContent = routine.title;
+  routineTitleInput.value = routine.title;
   routineMeta.textContent = `${routine.meta} • Created ${new Date(routine.createdAt || Date.now()).toLocaleDateString()}`;
 
   const completions = routine.completions || {};
@@ -1388,10 +1350,32 @@ function renderRoutine(routine) {
     routineWeeks.appendChild(block);
   });
 
+  // Auto-collapse completed weeks: expand only the first incomplete week
+  if (isSaved) {
+    const weekBlocks = routineWeeks.querySelectorAll(".week-block");
+    let expandedOne = false;
+    weekBlocks.forEach((block, wi) => {
+      const week = routine.weeks[wi];
+      const weekTotal = (week.sessions || []).length;
+      let weekDone = 0;
+      for (let si = 0; si < weekTotal; si++) {
+        if (completions[`${wi}-${si}`]) weekDone += 1;
+      }
+      if (!expandedOne && weekDone < weekTotal) {
+        // First incomplete week — keep expanded
+        expandedOne = true;
+      } else {
+        block.classList.add("collapsed");
+      }
+    });
+    // If all weeks are complete, expand the last week
+    if (!expandedOne && weekBlocks.length > 0) {
+      weekBlocks[weekBlocks.length - 1].classList.remove("collapsed");
+    }
+  }
+
   routineCard.classList.remove("hidden");
   routineEmptyState.classList.add("hidden");
-  saveRoutineNameInput.value = routine.title || "";
-  saveRoutineNameInput.placeholder = `Save as (optional title) • ${routine.title}`;
   updateStepper();
 }
 
@@ -1469,47 +1453,85 @@ function routineProgress(routine) {
 }
 
 function renderSavedRoutines() {
-  savedList.innerHTML = "";
-  savedEmptyState.classList.toggle("hidden", savedRoutines.length > 0);
+  // No-op: saved routines are now rendered inside the switcher modal
   renderUsage();
+}
 
-  getSortedRoutines().forEach((routine) => {
-    const node = savedRoutineTemplate.content.cloneNode(true);
-    const wrapper = node.querySelector(".saved-item");
+// ===== Routine Switcher Modal =====
+function openRoutineSwitcher() {
+  renderSwitcherList();
+  renderUsage();
+  setOverlayVisible(routineSwitcherModal, true);
+}
 
-    wrapper.querySelector(".saved-title").textContent = routine.title;
-    wrapper.querySelector(".saved-meta").textContent = `${routine.meta} • ${new Date(routine.createdAt).toLocaleDateString()}`;
+function closeRoutineSwitcher() {
+  setOverlayVisible(routineSwitcherModal, false);
+}
+
+switcherModalClose.addEventListener("click", closeRoutineSwitcher);
+routineSwitcherModal.addEventListener("click", (e) => {
+  if (e.target === routineSwitcherModal) closeRoutineSwitcher();
+});
+
+function renderSwitcherList() {
+  switcherList.innerHTML = "";
+  switcherEmptyState.classList.toggle("hidden", savedRoutines.length > 0);
+
+  const sorted = [...savedRoutines].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+  sorted.forEach((routine) => {
+    const item = document.createElement("article");
+    item.className = "switcher-item" + (currentRoutine?.id === routine.id ? " active" : "");
 
     const prog = routineProgress(routine);
-    wrapper.querySelector(".saved-progress-bar").style.width = `${prog.pct}%`;
-    wrapper.querySelector(".saved-progress-text").textContent = `${prog.done}/${prog.total} sessions (${prog.pct}%)`;
 
-    wrapper.querySelector(".load-btn").addEventListener("click", () => {
+    item.innerHTML = `
+      <div class="switcher-info">
+        <p class="saved-title">${routine.title}</p>
+        <p class="saved-meta">${routine.meta} &bull; ${new Date(routine.createdAt).toLocaleDateString()}</p>
+        <div class="saved-progress-wrap"><div class="saved-progress-bar" style="width:${prog.pct}%"></div></div>
+        <p class="saved-progress-text">${prog.done}/${prog.total} sessions (${prog.pct}%)</p>
+      </div>
+      <div class="switcher-actions">
+        <button class="btn btn-primary btn-sm load-btn" type="button">${currentRoutine?.id === routine.id ? "Active" : "Load"}</button>
+        <button class="btn btn-danger btn-sm delete-btn" type="button">Delete</button>
+      </div>
+    `;
+
+    const loadBtn = item.querySelector(".load-btn");
+    if (currentRoutine?.id === routine.id) {
+      loadBtn.disabled = true;
+    }
+    loadBtn.addEventListener("click", () => {
       currentRoutine = routine;
       renderRoutine(currentRoutine);
       hydrateForm(routine.profileSnapshot);
+      routineTitleInput.value = routine.title || "";
+      closeRoutineSwitcher();
       setPlanMode("generated");
     });
 
-    wrapper.querySelector(".delete-btn").addEventListener("click", () => {
+    item.querySelector(".delete-btn").addEventListener("click", () => {
       openConfirmModal("Delete Routine", `Are you sure you want to delete "${routine.title}"? This cannot be undone.`, async () => {
         try {
           await api(`/api/routines/${routine.id}`, { method: "DELETE" });
-          savedRoutines = savedRoutines.filter((item) => item.id !== routine.id);
+          savedRoutines = savedRoutines.filter((r) => r.id !== routine.id);
           setCachedRoutines(currentUser?.id, savedRoutines);
-          renderSavedRoutines();
+          renderSwitcherList();
+          renderUsage();
 
           if (currentRoutine?.id === routine.id) {
             currentRoutine = null;
             renderRoutine(null);
           }
+          if (activePlanMode === "home") renderHomeDashboard();
         } catch (err) {
           setMessage(err.message, true);
         }
       });
     });
 
-    savedList.appendChild(node);
+    switcherList.appendChild(item);
   });
 }
 
@@ -1705,11 +1727,12 @@ showGeneratedRoutineBtn.addEventListener("click", () => setPlanMode("generated")
 showCustomRoutineBtn.addEventListener("click", () => setPlanMode("custom"));
 showDrillLibraryBtn.addEventListener("click", () => setPlanMode("drills"));
 showStatsBtn.addEventListener("click", () => setPlanMode("stats"));
-showSavedBtn.addEventListener("click", () => setPlanMode("saved"));
 
 document.getElementById("homeGenerateBtn").addEventListener("click", () => setPlanMode("generated"));
 document.getElementById("homeCustomBtn").addEventListener("click", () => setPlanMode("custom"));
-document.getElementById("homeSavedBtn").addEventListener("click", () => setPlanMode("saved"));
+document.getElementById("homeSavedBtn").addEventListener("click", () => {
+  requireAuth("Sign in to view routines", () => openRoutineSwitcher());
+});
 document.getElementById("homeDrillsBtn").addEventListener("click", () => setPlanMode("drills"));
 document.getElementById("homeGetStartedBtn").addEventListener("click", () => setPlanMode("generated"));
 
@@ -1817,7 +1840,7 @@ saveRoutineBtn.addEventListener("click", () => {
 
   requireAuth("Sign in to save routines", async () => {
     try {
-      const customSaveName = saveRoutineNameInput.value.trim();
+      const customSaveName = routineTitleInput.value.trim();
       const isUpdate = Boolean(currentRoutine.id);
 
       if (isUpdate) {
@@ -1873,6 +1896,10 @@ saveRoutineBtn.addEventListener("click", () => {
   });
 });
 
+changeRoutineBtn.addEventListener("click", () => {
+  requireAuth("Sign in to view routines", () => openRoutineSwitcher());
+});
+
 editProfileBtn.addEventListener("click", () => {
   expandProfileForm();
 });
@@ -1917,7 +1944,7 @@ loadDemoBtn.addEventListener("click", () => {
   hydrateForm(demoProfile);
   currentRoutine = generateRoutine(demoProfile);
   renderRoutine(currentRoutine);
-  saveRoutineNameInput.value = currentRoutine.title;
+  routineTitleInput.value = currentRoutine.title;
   setMessage("Demo routine loaded. Save it to your profile if you want.");
 });
 
@@ -2557,7 +2584,7 @@ document.getElementById("customCreateBtn").addEventListener("click", () => {
     };
 
     renderRoutine(currentRoutine);
-    saveRoutineNameInput.value = currentRoutine.title;
+    routineTitleInput.value = currentRoutine.title;
     customBuilderState = null;
     customActiveSessionIndex = 0;
     setPlanMode("generated");

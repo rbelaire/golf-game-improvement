@@ -690,9 +690,26 @@ button:disabled {
   gap: 0.5rem;
 }
 
-#saveRoutineNameInput {
-  min-width: 0;
-  flex: 1 1 180px;
+input.routine-title {
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text);
+  padding: 0.25rem 0.4rem;
+  width: 100%;
+  font-family: inherit;
+}
+
+input.routine-title:hover {
+  border-color: var(--line);
+}
+
+input.routine-title:focus {
+  border-color: var(--accent);
+  outline: none;
+  background: var(--surface);
 }
 
 .empty-state {
@@ -715,7 +732,6 @@ button:disabled {
 
 .routine-title {
   margin: 0;
-  font-size: 1.05rem;
   color: var(--text);
 }
 
@@ -2198,10 +2214,6 @@ a {
     align-items: stretch;
   }
 
-  .routine-actions #saveRoutineNameInput {
-    width: 100%;
-  }
-
   .routine-actions #saveRoutineBtn {
     width: 100%;
   }
@@ -2290,6 +2302,66 @@ a {
     right: 0.5rem;
     left: 0.5rem;
     max-width: none;
+  }
+}
+
+/* ===== Routine Switcher Modal ===== */
+.switcher-card {
+  max-width: 520px;
+}
+
+.switcher-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.switcher-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.75rem;
+  background: var(--card-bg);
+  transition: border-color 200ms ease;
+}
+
+.switcher-item:hover {
+  border-color: rgba(76, 175, 80, 0.3);
+}
+
+.switcher-item.active {
+  border-color: var(--green);
+  background: var(--green-soft);
+}
+
+.switcher-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.switcher-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+@media (max-width: 600px) {
+  .switcher-item {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .switcher-actions {
+    flex-direction: row;
+    gap: 0.5rem;
+  }
+
+  .switcher-actions .btn {
+    flex: 1;
   }
 }
 

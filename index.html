@@ -114,9 +114,6 @@
       <button id="showStatsBtn" class="tab-btn" type="button">
         <span class="tab-icon">&#9670;</span><span class="tab-label">Stats</span>
       </button>
-      <button id="showSavedBtn" class="tab-btn" type="button">
-        <span class="tab-icon">&#9733;</span><span class="tab-label">Saved</span>
-      </button>
     </nav>
 
     <main class="layout">
@@ -149,7 +146,7 @@
         <div class="home-actions">
           <button id="homeGenerateBtn" class="btn btn-primary home-action-btn" type="button">Generate Routine</button>
           <button id="homeCustomBtn" class="btn btn-outline home-action-btn" type="button">Build Custom</button>
-          <button id="homeSavedBtn" class="btn btn-outline home-action-btn" type="button">View Saved</button>
+          <button id="homeSavedBtn" class="btn btn-outline home-action-btn" type="button">My Routines</button>
           <button id="homeDrillsBtn" class="btn btn-outline home-action-btn" type="button">Browse Drills</button>
         </div>
 
@@ -298,12 +295,12 @@
           <article id="routineCard" class="routine-card hidden">
             <div class="routine-header">
               <div class="routine-header-info">
-                <p id="routineTitle" class="routine-title"></p>
+                <input id="routineTitle" class="routine-title" type="text" placeholder="Routine name" />
                 <p id="routineMeta" class="routine-meta"></p>
               </div>
             </div>
             <div class="routine-actions">
-              <input id="saveRoutineNameInput" type="text" placeholder="Save as (optional title)" />
+              <button id="changeRoutineBtn" class="btn btn-outline" type="button">Change Routine</button>
               <button id="saveRoutineBtn" class="btn btn-primary" type="button">Save to Profile</button>
               <div class="export-menu-wrap">
                 <button id="exportMenuBtn" class="btn btn-outline" type="button">Export &#9662;</button>
@@ -457,40 +454,7 @@
         </div>
       </section>
 
-      <section class="panel saved-panel hidden">
-        <h2>Saved Routines</h2>
-        <div class="usage-row">
-          <p id="usageText" class="usage-text"></p>
-          <button id="upgradeBtn" class="btn btn-primary" type="button">Upgrade to Pro</button>
-        </div>
-        <div class="sort-controls">
-          <span class="sort-label">Sort:</span>
-          <button class="sort-btn active" data-sort="newest" type="button">Newest</button>
-          <button class="sort-btn" data-sort="oldest" type="button">Oldest</button>
-          <button class="sort-btn" data-sort="name" type="button">Name</button>
-          <button class="sort-btn" data-sort="progress" type="button">Progress</button>
-        </div>
-        <div id="savedEmptyState" class="empty-state">No routines saved yet.</div>
-        <div id="savedList" class="saved-list"></div>
-      </section>
     </main>
-
-    <template id="savedRoutineTemplate">
-      <article class="saved-item">
-        <div class="saved-info">
-          <p class="saved-title"></p>
-          <p class="saved-meta"></p>
-          <div class="saved-progress-wrap">
-            <div class="saved-progress-bar"></div>
-          </div>
-          <p class="saved-progress-text"></p>
-        </div>
-        <div class="saved-actions">
-          <button class="btn btn-outline load-btn" type="button">Load</button>
-          <button class="btn btn-danger delete-btn" type="button">Delete</button>
-        </div>
-      </article>
-    </template>
 
     <!-- Drill Detail Modal -->
     <div id="drillModal" class="modal-overlay hidden" role="dialog" aria-modal="true" hidden>
@@ -573,6 +537,20 @@
             <button id="authGateToggleBtn" class="btn btn-outline" type="button">Register</button>
           </div>
         </form>
+      </div>
+    </div>
+
+    <!-- Routine Switcher Modal -->
+    <div id="routineSwitcherModal" class="modal-overlay hidden" role="dialog" aria-modal="true" hidden>
+      <div class="modal-card switcher-card">
+        <button id="switcherModalClose" class="modal-close" type="button">&times;</button>
+        <h3>My Routines</h3>
+        <div class="usage-row">
+          <p id="usageText" class="usage-text"></p>
+          <button id="upgradeBtn" class="btn btn-primary btn-sm" type="button">Upgrade to Pro</button>
+        </div>
+        <div id="switcherEmptyState" class="empty-state hidden">No routines saved yet.</div>
+        <div id="switcherList" class="switcher-list"></div>
       </div>
     </div>
 
