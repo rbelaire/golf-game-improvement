@@ -230,6 +230,7 @@ describe("API", () => {
         name: "Alice",
         handicap: "Beginner (36+)",
         weakness: "Putting confidence",
+        weaknesses: ["Putting confidence", "Short game touch"],
         daysPerWeek: 3,
         hoursPerSession: 1.5,
         notes: "Focus on short putts"
@@ -243,6 +244,7 @@ describe("API", () => {
       const res = await authFetch("GET", "/api/profile", aliceToken);
       assert.equal(res.status, 200);
       assert.equal(res.body.profile.weakness, "Putting confidence");
+      assert.deepEqual(res.body.profile.weaknesses, ["Putting confidence", "Short game touch"]);
     });
 
     it("PUT /api/profile - rejects unauthenticated", async () => {

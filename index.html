@@ -232,34 +232,34 @@
               <input type="text" id="name" placeholder="Jordan Lee" required />
             </label>
 
-            <label>
-              Handicap Level
-              <select id="handicap" required>
-                <option value="">Select handicap range</option>
-                <option value="Beginner (20+)">Beginner (20+)</option>
-                <option value="Intermediate (10-19)">Intermediate (10-19)</option>
-                <option value="Advanced (0-9)">Advanced (0-9)</option>
-              </select>
-            </label>
+            <div class="form-field">
+              <span class="form-label">Handicap Level</span>
+              <div class="btn-group" id="handicapGroup">
+                <button type="button" class="btn-toggle" data-value="Beginner (20+)">Beginner (20+)</button>
+                <button type="button" class="btn-toggle" data-value="Intermediate (10-19)">Intermediate (10-19)</button>
+                <button type="button" class="btn-toggle" data-value="Advanced (0-9)">Advanced (0-9)</button>
+              </div>
+              <input type="hidden" id="handicap" required />
+            </div>
 
-            <label>
-              Primary Weakness
-              <select id="weakness" required>
-                <option value="">Select weakness</option>
-                <option value="Driving accuracy">Driving accuracy</option>
-                <option value="Approach consistency">Approach consistency</option>
-                <option value="Ball striking">Ball striking</option>
-                <option value="Short game touch">Short game touch</option>
-                <option value="Chipping & pitching">Chipping & pitching</option>
-                <option value="Putting confidence">Putting confidence</option>
-                <option value="Lag putting">Lag putting</option>
-                <option value="Distance control">Distance control</option>
-                <option value="Course management">Course management</option>
-                <option value="Mental game">Mental game</option>
-                <option value="Fairway woods & hybrids">Fairway woods & hybrids</option>
-                <option value="Scoring under pressure">Scoring under pressure</option>
-              </select>
-            </label>
+            <div class="form-field">
+              <span class="form-label">Weaknesses (pick up to 2)</span>
+              <div class="chip-grid" id="weaknessGrid">
+                <button type="button" class="chip" data-value="Driving accuracy">Driving accuracy</button>
+                <button type="button" class="chip" data-value="Approach consistency">Approach consistency</button>
+                <button type="button" class="chip" data-value="Ball striking">Ball striking</button>
+                <button type="button" class="chip" data-value="Short game touch">Short game touch</button>
+                <button type="button" class="chip" data-value="Chipping & pitching">Chipping &amp; pitching</button>
+                <button type="button" class="chip" data-value="Putting confidence">Putting confidence</button>
+                <button type="button" class="chip" data-value="Lag putting">Lag putting</button>
+                <button type="button" class="chip" data-value="Distance control">Distance control</button>
+                <button type="button" class="chip" data-value="Course management">Course management</button>
+                <button type="button" class="chip" data-value="Mental game">Mental game</button>
+                <button type="button" class="chip" data-value="Fairway woods & hybrids">Fairway woods &amp; hybrids</button>
+                <button type="button" class="chip" data-value="Scoring under pressure">Scoring under pressure</button>
+              </div>
+              <input type="hidden" id="weakness" required />
+            </div>
 
             <div class="inline-fields">
               <label>

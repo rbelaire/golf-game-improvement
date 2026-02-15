@@ -561,6 +561,73 @@ button:disabled {
   gap: 0.8rem;
 }
 
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.form-label {
+  font-size: 0.92rem;
+  color: var(--text);
+}
+
+/* Button group (handicap selector) */
+.btn-group {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.btn-toggle {
+  flex: 1;
+  padding: 0.6rem 0.5rem;
+  border: 1.5px solid var(--line);
+  border-radius: 10px;
+  background: var(--input-bg);
+  color: var(--text);
+  font: 600 0.82rem "Space Grotesk", sans-serif;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-toggle:hover {
+  border-color: var(--green);
+}
+
+.btn-toggle.selected {
+  background: var(--green);
+  color: #fff;
+  border-color: var(--green);
+}
+
+/* Chip grid (weakness selector) */
+.chip-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.chip {
+  padding: 0.45rem 0.75rem;
+  border: 1.5px solid var(--line);
+  border-radius: 20px;
+  background: var(--input-bg);
+  color: var(--text);
+  font: 500 0.82rem "Space Grotesk", sans-serif;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.chip:hover {
+  border-color: var(--green);
+}
+
+.chip.selected {
+  background: var(--green);
+  color: #fff;
+  border-color: var(--green);
+}
+
 /* ===== Buttons ===== */
 .btn {
   border: 1px solid transparent;

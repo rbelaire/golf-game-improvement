@@ -987,10 +987,13 @@ function renderHomeDashboard() {
 }
 
 function getProfileFromForm() {
+  const weaknesses = Array.from(document.querySelectorAll("#weaknessGrid .chip.selected"))
+    .map(btn => btn.dataset.value);
   return {
     name: document.getElementById("name").value.trim(),
     handicap: document.getElementById("handicap").value,
-    weakness: document.getElementById("weakness").value,
+    weakness: weaknesses[0] || "",
+    weaknesses,
     daysPerWeek: Number(document.getElementById("daysPerWeek").value),
     hoursPerSession: Number(document.getElementById("hoursPerSession").value),
     notes: document.getElementById("notes").value.trim()
@@ -999,15 +1002,28 @@ function getProfileFromForm() {
 
 function hydrateForm(profile) {
   document.getElementById("name").value = profile?.name || "";
-  document.getElementById("handicap").value = profile?.handicap || "";
-  document.getElementById("weakness").value = profile?.weakness || "";
   document.getElementById("daysPerWeek").value = profile?.daysPerWeek || 3;
   document.getElementById("hoursPerSession").value = profile?.hoursPerSession || 1.5;
   document.getElementById("notes").value = profile?.notes || "";
+
+  // Hydrate handicap buttons
+  const handicapVal = profile?.handicap || "";
+  document.getElementById("handicap").value = handicapVal;
+  document.querySelectorAll("#handicapGroup .btn-toggle").forEach(btn => {
+    btn.classList.toggle("selected", btn.dataset.value === handicapVal);
+  });
+
+  // Hydrate weakness chips
+  const weaknesses = profile?.weaknesses || (profile?.weakness ? [profile.weakness] : []);
+  document.getElementById("weakness").value = weaknesses[0] || "";
+  document.querySelectorAll("#weaknessGrid .chip").forEach(btn => {
+    btn.classList.toggle("selected", weaknesses.includes(btn.dataset.value));
+  });
 }
 
 function isProfileComplete(profile) {
-  return profile && profile.name && profile.handicap && profile.weakness;
+  const hasWeakness = (profile.weaknesses && profile.weaknesses.length > 0) || profile.weakness;
+  return profile && profile.name && profile.handicap && hasWeakness;
 }
 
 function renderProfileSummary(profile) {
@@ -1018,7 +1034,8 @@ function renderProfileSummary(profile) {
   }
   document.getElementById("summaryName").textContent = profile.name;
   document.getElementById("summaryHandicap").textContent = profile.handicap.replace(/\s*\(.*\)/, "");
-  document.getElementById("summaryWeakness").textContent = profile.weakness;
+  const weaknesses = profile.weaknesses || (profile.weakness ? [profile.weakness] : []);
+  document.getElementById("summaryWeakness").textContent = weaknesses.join(" & ");
   document.getElementById("summarySchedule").textContent =
     (profile.daysPerWeek || 3) + "d/wk \u00B7 " + (profile.hoursPerSession || 1.5) + "h";
   profileSummary.classList.remove("hidden");
@@ -1033,7 +1050,7 @@ function expandProfileForm() {
 
 function lockPlanner(locked) {
   const fields = document.querySelectorAll(
-    "#profileForm input, #profileForm select, #profileForm textarea, #profileForm button"
+    "#profileForm input, #profileForm select, #profileForm textarea, #profileForm button, #profileForm .btn-toggle, #profileForm .chip"
   );
   fields.forEach((field) => {
     field.disabled = locked;
@@ -1104,7 +1121,7 @@ function setAuthMode(registerMode) {
   }
 }
 
-function focusMapByWeakness(weakness) {
+function focusMapByWeakness(weaknessInput) {
   const mapping = {
     "Driving accuracy": ["fairway finder drill", "launch window control", "pressure tee shots"],
     "Approach consistency": ["distance ladder work", "shot-shape rehearsal", "target proximity challenge"],
@@ -1120,7 +1137,15 @@ function focusMapByWeakness(weakness) {
     "Scoring under pressure": ["par saver challenge", "must-make putts", "close-out drill"]
   };
 
-  return mapping[weakness] || ["full swing calibration", "short game fundamentals", "mental reset routine"];
+  const weaknesses = Array.isArray(weaknessInput) ? weaknessInput : [weaknessInput];
+  const areas = [];
+  for (const w of weaknesses) {
+    const mapped = mapping[w] || [];
+    for (const a of mapped) {
+      if (!areas.includes(a)) areas.push(a);
+    }
+  }
+  return areas.length ? areas : ["full swing calibration", "short game fundamentals", "mental reset routine"];
 }
 
 function intensityForHandicap(handicap) {
@@ -1145,7 +1170,8 @@ function buildSessionBlock(dayIndex, profile, focusAreas) {
 }
 
 function generateRoutine(profile) {
-  const focusAreas = focusMapByWeakness(profile.weakness);
+  const weaknesses = profile.weaknesses || (profile.weakness ? [profile.weakness] : []);
+  const focusAreas = focusMapByWeakness(weaknesses);
   const intensity = intensityForHandicap(profile.handicap);
   const weeks = [];
 
@@ -1165,9 +1191,10 @@ function generateRoutine(profile) {
     });
   }
 
+  const weaknessLabel = weaknesses.join(" & ") || "General";
   return {
     profileSnapshot: profile,
-    title: `${profile.name}'s 4-Week ${profile.weakness} Plan`,
+    title: `${profile.name}'s 4-Week ${weaknessLabel} Plan`,
     meta: `${profile.handicap} • ${profile.daysPerWeek} days/week • ${profile.hoursPerSession} hr/session`,
     weeks
   };
@@ -1689,6 +1716,31 @@ document.getElementById("homeGetStartedBtn").addEventListener("click", () => set
 document.getElementById("loadDemoBtnInline").addEventListener("click", () => {
   loadDemoBtn.click();
 });
+
+// Handicap button group — single select
+document.querySelectorAll("#handicapGroup .btn-toggle").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll("#handicapGroup .btn-toggle").forEach(b => b.classList.remove("selected"));
+    btn.classList.add("selected");
+    document.getElementById("handicap").value = btn.dataset.value;
+  });
+});
+
+// Weakness chip grid — multi-select, max 2
+document.querySelectorAll("#weaknessGrid .chip").forEach(btn => {
+  btn.addEventListener("click", () => {
+    if (btn.classList.contains("selected")) {
+      btn.classList.remove("selected");
+    } else {
+      const selected = document.querySelectorAll("#weaknessGrid .chip.selected");
+      if (selected.length >= 2) return;
+      btn.classList.add("selected");
+    }
+    const vals = Array.from(document.querySelectorAll("#weaknessGrid .chip.selected")).map(b => b.dataset.value);
+    document.getElementById("weakness").value = vals[0] || "";
+  });
+});
+
 authForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (currentUser) return;
@@ -1718,9 +1770,12 @@ profileForm.addEventListener("submit", (event) => {
   event.preventDefault();
   if (isGeneratingRoutine) return;
 
-  if (!profileForm.checkValidity()) {
-    profileForm.reportValidity();
-    setMessage("Complete all required profile fields before generating a routine.", true);
+  const handicapVal = document.getElementById("handicap").value;
+  const weaknessSelected = document.querySelectorAll("#weaknessGrid .chip.selected").length > 0;
+  if (!handicapVal || !weaknessSelected || !profileForm.checkValidity()) {
+    if (!handicapVal) setMessage("Select a handicap level.", true);
+    else if (!weaknessSelected) setMessage("Select at least one weakness.", true);
+    else { profileForm.reportValidity(); setMessage("Complete all required profile fields before generating a routine.", true); }
     return;
   }
 
@@ -1853,6 +1908,7 @@ loadDemoBtn.addEventListener("click", () => {
     name: currentUser?.name || "Alex Morgan",
     handicap: "Intermediate (10-19)",
     weakness: "Putting confidence",
+    weaknesses: ["Putting confidence", "Short game touch"],
     daysPerWeek: 4,
     hoursPerSession: 1.5,
     notes: "Weekend practice should include 9-hole simulation"

@@ -18,7 +18,7 @@ Golf practice planning web app. Users build profiles, generate drill routines vi
 | `server.js` | HTTP server, all API route handlers, static file serving, `.env` loader |
 | `api/index.js` | Vercel serverless entry point (thin wrapper around `requestHandler`) |
 | `lib/db.js` | Data layer — Postgres or JSON file, user/session/routine CRUD |
-| `lib/drills.js` | Drill library (120 drills), rules engine (`buildRulesRoutine`), profile validation |
+| `lib/drills.js` | Drill library (330 drills), rules engine (`buildRulesRoutine`), profile validation |
 | `lib/rate-limit.js` | In-memory rate limiter |
 | `app.js` | All frontend logic (SPA routing, API calls, UI rendering) |
 | `index.html` | Full app markup (all views/modals inline) |
@@ -38,6 +38,15 @@ All under `/api/`. Auth routes: `/auth/register`, `/auth/login`, `/auth/logout`,
 - **Save button** uses POST for new routines, PUT for updating existing ones (checks `currentRoutine.id`)
 - **Routines cached** in localStorage as fallback for ephemeral server storage
 - **Drill library** loaded lazily from `/api/drills`, cached in `drillLibraryCache`
+- **Profile form** uses button groups (handicap) and chip grid (weaknesses) instead of `<select>` dropdowns
+- **Weaknesses** support up to 2 selections; stored as both `weaknesses` (array) and `weakness` (string, first item) for backward compat
+- **Rules engine** alternates weakness focus across sessions when 2 weaknesses are selected
+
+## Data Model Notes
+
+- Profile has both `weakness` (string) and `weaknesses` (array of 1-2 strings). `normalizeProfile()` in `lib/drills.js` always produces both fields.
+- Legacy profiles with only `weakness` (string) are fully supported — `validateProfileShape()` accepts either format.
+- `profileSnapshot` stored in routines may have either format; stats in `lib/db.js` handle both.
 
 ## Conventions
 
