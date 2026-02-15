@@ -192,23 +192,6 @@
       <section class="panel plan-panel">
         <h2 id="planPanelTitle">Generated Practice Routine</h2>
 
-        <div id="stepperBar" class="stepper-bar hidden">
-          <div class="stepper-step active" data-step="1">
-            <div class="stepper-circle">1</div>
-            <span class="stepper-label">Profile</span>
-          </div>
-          <div class="stepper-connector"></div>
-          <div class="stepper-step upcoming" data-step="2">
-            <div class="stepper-circle">2</div>
-            <span class="stepper-label">Generate</span>
-          </div>
-          <div class="stepper-connector"></div>
-          <div class="stepper-step upcoming" data-step="3">
-            <div class="stepper-circle">3</div>
-            <span class="stepper-label">Practice</span>
-          </div>
-        </div>
-
         <div id="profileSummary" class="profile-summary hidden">
           <div class="profile-summary-tags">
             <span class="profile-tag" id="summaryName"></span>
@@ -258,15 +241,42 @@
               <input type="hidden" id="weakness" required />
             </div>
 
-            <div class="inline-fields">
-              <label>
-                Days / week
-                <input type="number" id="daysPerWeek" min="1" max="7" value="3" required />
-              </label>
-              <label>
-                Hours / session
-                <input type="number" id="hoursPerSession" min="0.5" max="6" step="0.5" value="1.5" required />
-              </label>
+            <div class="form-field">
+              <span class="form-label">Days / week</span>
+              <div class="btn-group" id="daysPerWeekGroup">
+                <button type="button" class="btn-toggle" data-value="1">1</button>
+                <button type="button" class="btn-toggle" data-value="2">2</button>
+                <button type="button" class="btn-toggle selected" data-value="3">3</button>
+                <button type="button" class="btn-toggle" data-value="4">4</button>
+                <button type="button" class="btn-toggle" data-value="5">5</button>
+                <button type="button" class="btn-toggle" data-value="6">6</button>
+                <button type="button" class="btn-toggle" data-value="7">7</button>
+              </div>
+              <input type="hidden" id="daysPerWeek" value="3" required />
+            </div>
+
+            <div class="form-field">
+              <span class="form-label">Session duration</span>
+              <div class="duration-picker" id="durationPicker">
+                <div class="duration-scroll-group">
+                  <label class="duration-scroll-label">Hours</label>
+                  <div class="duration-scroll-wrap">
+                    <button type="button" class="duration-arrow up" data-target="durationHours" data-dir="up">&#9650;</button>
+                    <div class="duration-scroll-value" id="durationHours" data-value="1">1</div>
+                    <button type="button" class="duration-arrow down" data-target="durationHours" data-dir="down">&#9660;</button>
+                  </div>
+                </div>
+                <span class="duration-separator">:</span>
+                <div class="duration-scroll-group">
+                  <label class="duration-scroll-label">Min</label>
+                  <div class="duration-scroll-wrap">
+                    <button type="button" class="duration-arrow up" data-target="durationMinutes" data-dir="up">&#9650;</button>
+                    <div class="duration-scroll-value" id="durationMinutes" data-value="30">30</div>
+                    <button type="button" class="duration-arrow down" data-target="durationMinutes" data-dir="down">&#9660;</button>
+                  </div>
+                </div>
+              </div>
+              <input type="hidden" id="hoursPerSession" value="1.5" required />
             </div>
 
             <label>
@@ -281,16 +291,8 @@
           </form>
         </div>
         <div id="generatedRoutineView">
-          <div class="panel-subsection generated-subsection">
-            <h3>Rules Engine Plan</h3>
-            <p class="plan-mode-note">Use your profile form to generate a personalized routine.</p>
-          </div>
           <div id="routineEmptyState" class="empty-state">
-            <span id="routineEmptyText">Fill out your profile to generate a training routine.</span>
-            <div class="empty-state-actions">
-              <button id="emptyStateGenerateBtn" class="btn btn-primary hidden" type="button">Generate Routine</button>
-              <button id="loadDemoBtnInline" class="btn btn-outline" type="button">Load Demo Data</button>
-            </div>
+            <span id="routineEmptyText">Complete your profile above to generate a training routine.</span>
           </div>
           <article id="routineCard" class="routine-card hidden">
             <div class="routine-header">

@@ -493,10 +493,6 @@ h2 {
   background: var(--card-bg);
 }
 
-.generated-subsection {
-  border-left: 4px solid #4caf50;
-}
-
 .custom-subsection {
   border-left: 4px solid #d61d1d;
 }
@@ -2222,20 +2218,6 @@ a {
     align-self: flex-end;
   }
 
-  .stepper-connector {
-    width: 24px;
-  }
-
-  .stepper-circle {
-    width: 28px;
-    height: 28px;
-    font-size: 0.78rem;
-  }
-
-  .stepper-label {
-    font-size: 0.68rem;
-  }
-
   .stats-grid {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -2428,84 +2410,65 @@ a {
   text-align: left;
 }
 
-/* ===== Stepper Bar ===== */
-.stepper-bar {
+/* ===== Duration Picker ===== */
+.duration-picker {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 0;
-  padding: 0.75rem 0;
-  margin-bottom: 1rem;
+  gap: 0.5rem;
 }
 
-.stepper-step {
+.duration-scroll-group {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.3rem;
-  cursor: pointer;
-  transition: opacity 200ms ease;
+  gap: 0.15rem;
 }
 
-.stepper-circle {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font: 700 0.85rem "Rajdhani", sans-serif;
-  border: 2px solid var(--line);
-  color: var(--muted);
-  background: transparent;
-  transition: all 250ms ease;
-}
-
-.stepper-label {
-  font-size: 0.75rem;
+.duration-scroll-label {
+  font-size: 0.72rem;
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  transition: color 250ms ease;
+  margin-bottom: 0.1rem;
 }
 
-.stepper-step.active .stepper-circle {
-  background: var(--green);
-  border-color: var(--green);
-  color: #fff;
+.duration-scroll-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
 }
 
-.stepper-step.active .stepper-label {
-  color: var(--green);
-  font-weight: 600;
-}
-
-.stepper-step.completed .stepper-circle {
-  border-color: var(--green);
-  color: var(--green);
-  background: transparent;
-}
-
-.stepper-step.completed .stepper-label {
-  color: var(--green);
-}
-
-.stepper-step.upcoming .stepper-circle {
-  border-color: var(--line);
+.duration-arrow {
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 6px;
   color: var(--muted);
+  cursor: pointer;
+  font-size: 0.65rem;
+  padding: 0.2rem 0.6rem;
+  line-height: 1;
+  transition: all 150ms ease;
 }
 
-.stepper-connector {
-  width: 40px;
-  height: 2px;
-  background: var(--line);
-  margin: 0 0.4rem;
-  margin-bottom: 1.2rem;
-  transition: background 250ms ease;
+.duration-arrow:hover {
+  border-color: var(--green);
+  color: var(--green);
 }
 
-.stepper-connector.completed {
-  background: var(--green);
+.duration-scroll-value {
+  font: 700 1.4rem "Rajdhani", sans-serif;
+  color: var(--text);
+  min-width: 40px;
+  text-align: center;
+  padding: 0.15rem 0;
+  user-select: none;
+}
+
+.duration-separator {
+  font: 700 1.4rem "Rajdhani", sans-serif;
+  color: var(--muted);
+  padding-top: 1rem;
 }
 
 /* ===== Print ===== */

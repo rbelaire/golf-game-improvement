@@ -111,9 +111,7 @@ const authGateToggleBtn = document.getElementById("authGateToggleBtn");
 const authGateTitle = document.getElementById("authGateTitle");
 const authGateMessage = document.getElementById("authGateMessage");
 const topSignInBtn = document.getElementById("topSignInBtn");
-const stepperBar = document.getElementById("stepperBar");
 const routineEmptyText = document.getElementById("routineEmptyText");
-const emptyStateGenerateBtn = document.getElementById("emptyStateGenerateBtn");
 const exportMenuBtn = document.getElementById("exportMenuBtn");
 const exportMenuDropdown = document.getElementById("exportMenuDropdown");
 
@@ -374,82 +372,21 @@ document.addEventListener("click", (e) => {
   }
 });
 
-// ===== Stepper Bar =====
-function updateStepper() {
-  if (!stepperBar) return;
-
-  const isAuthed = Boolean(currentUser);
-  const isGeneratedTab = activePlanMode === "generated";
-
-  if (!isAuthed || !isGeneratedTab) {
-    stepperBar.classList.add("hidden");
-    return;
-  }
-
-  stepperBar.classList.remove("hidden");
+// ===== Empty State Text =====
+function updateEmptyState() {
+  if (!routineEmptyText) return;
+  if (currentRoutine) return; // empty state hidden when routine exists
 
   const profile = getProfileFromForm();
   const hasProfile = isProfileComplete(profile);
-  const hasRoutine = Boolean(currentRoutine);
+  const isAuthed = Boolean(currentUser);
 
-  let currentStep;
-  if (hasRoutine) currentStep = 3;
-  else if (hasProfile) currentStep = 2;
-  else currentStep = 1;
-
-  const steps = stepperBar.querySelectorAll(".stepper-step");
-  const connectors = stepperBar.querySelectorAll(".stepper-connector");
-
-  steps.forEach((stepEl) => {
-    const stepNum = Number(stepEl.dataset.step);
-    stepEl.classList.remove("active", "completed", "upcoming");
-    if (stepNum < currentStep) stepEl.classList.add("completed");
-    else if (stepNum === currentStep) stepEl.classList.add("active");
-    else stepEl.classList.add("upcoming");
-  });
-
-  connectors.forEach((conn, i) => {
-    conn.classList.toggle("completed", i + 1 < currentStep);
-  });
-
-  // Update empty state text based on stepper state
-  if (currentStep === 2 && !hasRoutine) {
-    routineEmptyText.textContent = "Your profile is ready. Generate a personalized routine!";
-    emptyStateGenerateBtn.classList.remove("hidden");
-  } else if (currentStep === 1) {
-    routineEmptyText.textContent = "Fill out your profile to generate a training routine.";
-    emptyStateGenerateBtn.classList.add("hidden");
+  if (!isAuthed || !hasProfile) {
+    routineEmptyText.textContent = "Complete your profile above to generate a training routine.";
   } else {
-    emptyStateGenerateBtn.classList.add("hidden");
+    routineEmptyText.textContent = "Hit \u2018Generate Routine\u2019 above to create your plan.";
   }
 }
-
-// Stepper click navigation
-stepperBar.addEventListener("click", (e) => {
-  const stepEl = e.target.closest(".stepper-step");
-  if (!stepEl) return;
-  const stepNum = Number(stepEl.dataset.step);
-
-  if (stepNum === 1) {
-    expandProfileForm();
-    document.getElementById("name").focus();
-  } else if (stepNum === 2) {
-    const profile = getProfileFromForm();
-    if (isProfileComplete(profile)) {
-      profileForm.requestSubmit();
-    } else {
-      showToast("Complete your profile first.", true);
-    }
-  } else if (stepNum === 3) {
-    if (routineCard && !routineCard.classList.contains("hidden")) {
-      routineCard.scrollIntoView({ behavior: "smooth" });
-    }
-  }
-});
-
-emptyStateGenerateBtn.addEventListener("click", () => {
-  profileForm.requestSubmit();
-});
 
 // ===== Sample Stats for Logged-Out Users =====
 function renderSampleStats() {
@@ -888,7 +825,7 @@ function setPlanMode(mode) {
     showGeneratedRoutineBtn.classList.add("active");
     planPanelTitle.textContent = "Generated Practice Routine";
   }
-  updateStepper();
+  updateEmptyState();
 }
 
 function renderHomeDashboard() {
@@ -968,9 +905,27 @@ function getProfileFromForm() {
 
 function hydrateForm(profile) {
   document.getElementById("name").value = profile?.name || "";
-  document.getElementById("daysPerWeek").value = profile?.daysPerWeek || 3;
-  document.getElementById("hoursPerSession").value = profile?.hoursPerSession || 1.5;
   document.getElementById("notes").value = profile?.notes || "";
+
+  // Hydrate days per week button group
+  const daysVal = String(profile?.daysPerWeek || 3);
+  document.getElementById("daysPerWeek").value = daysVal;
+  document.querySelectorAll("#daysPerWeekGroup .btn-toggle").forEach(btn => {
+    btn.classList.toggle("selected", btn.dataset.value === daysVal);
+  });
+
+  // Hydrate duration picker
+  const hours = profile?.hoursPerSession || 1.5;
+  const wholeHours = Math.floor(hours);
+  const mins = Math.round((hours - wholeHours) * 60);
+  const roundedMins = Math.round(mins / 15) * 15;
+  document.getElementById("hoursPerSession").value = hours;
+  const durationHours = document.getElementById("durationHours");
+  const durationMinutes = document.getElementById("durationMinutes");
+  durationHours.dataset.value = wholeHours;
+  durationHours.textContent = wholeHours;
+  durationMinutes.dataset.value = roundedMins;
+  durationMinutes.textContent = String(roundedMins).padStart(2, "0");
 
   // Hydrate handicap buttons
   const handicapVal = profile?.handicap || "";
@@ -1002,11 +957,15 @@ function renderProfileSummary(profile) {
   document.getElementById("summaryHandicap").textContent = profile.handicap.replace(/\s*\(.*\)/, "");
   const weaknesses = profile.weaknesses || (profile.weakness ? [profile.weakness] : []);
   document.getElementById("summaryWeakness").textContent = weaknesses.join(" & ");
+  const hrs = profile.hoursPerSession || 1.5;
+  const hrsWhole = Math.floor(hrs);
+  const minsLeft = Math.round((hrs - hrsWhole) * 60);
+  const durationLabel = minsLeft > 0 ? `${hrsWhole}h ${minsLeft}m` : `${hrsWhole}h`;
   document.getElementById("summarySchedule").textContent =
-    (profile.daysPerWeek || 3) + "d/wk \u00B7 " + (profile.hoursPerSession || 1.5) + "h";
+    (profile.daysPerWeek || 3) + "d/wk \u00B7 " + durationLabel;
   profileSummary.classList.remove("hidden");
   profileFormWrap.classList.add("collapsed");
-  updateStepper();
+  updateEmptyState();
 }
 
 function expandProfileForm() {
@@ -1028,9 +987,6 @@ function lockPlanner(locked) {
 
   if (locked) {
     renderRoutine(null);
-    routineEmptyText.textContent = "Fill out your profile to generate a training routine.";
-  } else {
-    routineEmptyText.textContent = "Fill out your profile to generate a training routine.";
   }
 
   if (locked) {
@@ -1376,7 +1332,7 @@ function renderRoutine(routine) {
 
   routineCard.classList.remove("hidden");
   routineEmptyState.classList.add("hidden");
-  updateStepper();
+  updateEmptyState();
 }
 
 async function toggleCompletion(routineId, key, weekIndex, weekTotal) {
@@ -1552,7 +1508,7 @@ async function loadUserData() {
   renderSavedRoutines();
   currentRoutine = null;
   renderRoutine(null);
-  updateStepper();
+  updateEmptyState();
   if (activePlanMode === "home") renderHomeDashboard();
 }
 
@@ -1573,7 +1529,7 @@ function updateAuthUi() {
   }
   lockPlanner(!isAuthed);
   renderUsage();
-  updateStepper();
+  updateEmptyState();
 }
 
 async function register() {
@@ -1652,7 +1608,7 @@ async function logout() {
   renderRoutine(null);
   renderSavedRoutines();
   updateAuthUi();
-  updateStepper();
+  updateEmptyState();
   setMessage("Logged out.");
 }
 
@@ -1736,10 +1692,6 @@ document.getElementById("homeSavedBtn").addEventListener("click", () => {
 document.getElementById("homeDrillsBtn").addEventListener("click", () => setPlanMode("drills"));
 document.getElementById("homeGetStartedBtn").addEventListener("click", () => setPlanMode("generated"));
 
-document.getElementById("loadDemoBtnInline").addEventListener("click", () => {
-  loadDemoBtn.click();
-});
-
 // Handicap button group — single select
 document.querySelectorAll("#handicapGroup .btn-toggle").forEach(btn => {
   btn.addEventListener("click", () => {
@@ -1761,6 +1713,45 @@ document.querySelectorAll("#weaknessGrid .chip").forEach(btn => {
     }
     const vals = Array.from(document.querySelectorAll("#weaknessGrid .chip.selected")).map(b => b.dataset.value);
     document.getElementById("weakness").value = vals[0] || "";
+  });
+});
+
+// Days per week button group — single select
+document.querySelectorAll("#daysPerWeekGroup .btn-toggle").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll("#daysPerWeekGroup .btn-toggle").forEach(b => b.classList.remove("selected"));
+    btn.classList.add("selected");
+    document.getElementById("daysPerWeek").value = btn.dataset.value;
+  });
+});
+
+// Duration picker — hours & minutes with 15-min intervals
+function updateHoursPerSession() {
+  const h = Number(document.getElementById("durationHours").dataset.value);
+  const m = Number(document.getElementById("durationMinutes").dataset.value);
+  const total = h + m / 60;
+  document.getElementById("hoursPerSession").value = total;
+}
+
+document.querySelectorAll(".duration-arrow").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const target = document.getElementById(btn.dataset.target);
+    const dir = btn.dataset.dir;
+    let val = Number(target.dataset.value);
+
+    if (target.id === "durationHours") {
+      val = dir === "up" ? Math.min(val + 1, 8) : Math.max(val - 1, 0);
+      target.dataset.value = val;
+      target.textContent = val;
+    } else {
+      const steps = [0, 15, 30, 45];
+      let idx = steps.indexOf(val);
+      if (idx === -1) idx = 0;
+      idx = dir === "up" ? Math.min(idx + 1, steps.length - 1) : Math.max(idx - 1, 0);
+      target.dataset.value = steps[idx];
+      target.textContent = String(steps[idx]).padStart(2, "0");
+    }
+    updateHoursPerSession();
   });
 });
 
@@ -1823,7 +1814,7 @@ profileForm.addEventListener("submit", (event) => {
       currentRoutine = generation.routine;
       renderRoutine(currentRoutine);
       renderProfileSummary(profile);
-      updateStepper();
+      updateEmptyState();
       setMessage("Routine generated with smart rules engine. Save it when ready.");
     } catch (err) {
       setMessage(err.message, true);
