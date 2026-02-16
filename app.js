@@ -29,6 +29,9 @@ const showGeneratedRoutineBtn = document.getElementById("showGeneratedRoutineBtn
 const showCustomRoutineBtn = document.getElementById("showCustomRoutineBtn");
 const generatedRoutineView = document.getElementById("generatedRoutineView");
 const customRoutineView = document.getElementById("customRoutineView");
+const planGeneratedView = document.getElementById("planGeneratedView");
+const planSegGenerated = document.getElementById("planSegGenerated");
+const planSegCustom = document.getElementById("planSegCustom");
 const planPanelTitle = document.getElementById("planPanelTitle");
 const userMenuWrap = document.getElementById("userMenuWrap");
 const userMenuBtn = document.getElementById("userMenuBtn");
@@ -83,6 +86,14 @@ const homeTodayCard = document.getElementById("homeTodayCard");
 const homeProgressGrid = document.getElementById("homeProgressGrid");
 const homeQuickActions = document.getElementById("homeQuickActions");
 const homeRecentRoutines = document.getElementById("homeRecentRoutines");
+const homeSessionRunner = document.getElementById("homeSessionRunner");
+const runnerBackBtn = document.getElementById("runnerBackBtn");
+const runnerHeader = document.getElementById("runnerHeader");
+const runnerDrills = document.getElementById("runnerDrills");
+const runnerProgressText = document.getElementById("runnerProgressText");
+const runnerProgressPct = document.getElementById("runnerProgressPct");
+const runnerProgressBar = document.getElementById("runnerProgressBar");
+const runnerCompleteBtn = document.getElementById("runnerCompleteBtn");
 
 const themeToggleBtn = document.getElementById("themeToggleBtn");
 const themeIcon = document.getElementById("themeIcon");
@@ -123,9 +134,13 @@ let savedRoutines = [];
 let isRegisterMode = false;
 let isGeneratingRoutine = false;
 let activePlanMode = "home";
+let activePlanSubmode = "generated"; // "generated" | "custom"
+const PLAN_SUBMODE_KEY = "thegolfbuild_plan_submode";
 let drillLibraryCache = null;
 let pendingReflection = null;
 let customBuilderState = null;
+// Session runner state — persists while user navigates away and returns
+let runnerState = null; // { routine, weekIndex, sessionIndex, key, drillChecked: boolean[] }
 let customActiveSessionIndex = 0;
 let customDrillFilterType = null;
 const FREE_ROUTINE_LIMIT = 5;
@@ -786,13 +801,33 @@ function getDisplayFirstName() {
   return first.charAt(0).toUpperCase() + first.slice(1);
 }
 
+function setPlanSubmode(submode) {
+  activePlanSubmode = submode;
+  try { localStorage.setItem(PLAN_SUBMODE_KEY, submode); } catch (_) {}
+
+  if (submode === "custom") {
+    planGeneratedView.classList.add("hidden");
+    customRoutineView.classList.remove("hidden");
+    planSegGenerated.classList.remove("active");
+    planSegGenerated.setAttribute("aria-selected", "false");
+    planSegCustom.classList.add("active");
+    planSegCustom.setAttribute("aria-selected", "true");
+    if (!customBuilderState) showCustomStep(1);
+  } else {
+    customRoutineView.classList.add("hidden");
+    planGeneratedView.classList.remove("hidden");
+    planSegCustom.classList.remove("active");
+    planSegCustom.setAttribute("aria-selected", "false");
+    planSegGenerated.classList.add("active");
+    planSegGenerated.setAttribute("aria-selected", "true");
+  }
+}
+
 function setPlanMode(mode) {
   activePlanMode = mode;
   const planPanel = document.querySelector(".plan-panel");
 
   homePanel.classList.add("hidden");
-  generatedRoutineView.classList.add("hidden");
-  customRoutineView.classList.add("hidden");
   drillLibraryPanel.classList.add("hidden");
   statsPanel.classList.add("hidden");
   planPanel.classList.add("hidden");
@@ -808,11 +843,10 @@ function setPlanMode(mode) {
     showHomeBtn.classList.add("active");
     renderHomeDashboard();
   } else if (mode === "custom") {
+    // "custom" deep-link: show plan panel and switch to custom submode
     planPanel.classList.remove("hidden");
-    customRoutineView.classList.remove("hidden");
-    showCustomRoutineBtn.classList.add("active");
-    planPanelTitle.textContent = "Custom Practice Routine";
-    if (!customBuilderState) showCustomStep(1);
+    showGeneratedRoutineBtn.classList.add("active");
+    setPlanSubmode("custom");
   } else if (mode === "drills") {
     drillLibraryPanel.classList.remove("hidden");
     showDrillLibraryBtn.classList.add("active");
@@ -822,10 +856,11 @@ function setPlanMode(mode) {
     showStatsBtn.classList.add("active");
     loadStats();
   } else {
+    // "generated" and any other value → plan panel, restore last submode
     planPanel.classList.remove("hidden");
-    generatedRoutineView.classList.remove("hidden");
     showGeneratedRoutineBtn.classList.add("active");
-    planPanelTitle.textContent = "Generated Practice Routine";
+    const savedSub = (() => { try { return localStorage.getItem(PLAN_SUBMODE_KEY); } catch (_) { return null; } })();
+    setPlanSubmode(savedSub || "generated");
   }
   updateEmptyState();
 }
@@ -872,6 +907,16 @@ function countThisWeekSessions() {
 }
 
 function renderHomeDashboard() {
+  // If a runner session is active, restore it instead of the dashboard
+  if (runnerState) {
+    homeOnboarding.classList.add("hidden");
+    homeDashboard.classList.add("hidden");
+    homeSessionRunner.classList.remove("hidden");
+    renderRunnerUI();
+    return;
+  }
+
+  homeSessionRunner.classList.add("hidden");
   const state = getOnboardingState();
 
   if (state.allDone) {
@@ -887,10 +932,10 @@ function renderHomeDashboard() {
 
 function renderOnboardingChecklist(state) {
   const steps = [
-    { label: "Create account", done: state.signedUp, action: () => setPlanMode("generated") },
-    { label: "Set up golf profile", done: state.profileDone, action: () => { setPlanMode("generated"); expandProfileForm(); } },
-    { label: "Generate first routine", done: state.routineGenerated, action: () => setPlanMode("generated") },
-    { label: "Complete first session", done: state.sessionCompleted, action: () => {
+    { label: "Create account",        hint: "Sign up to save your progress",                done: state.signedUp,         action: () => setPlanMode("generated") },
+    { label: "Set up golf profile",   hint: "Tell us your handicap and weaknesses",          done: state.profileDone,      action: () => { setPlanMode("generated"); expandProfileForm(); } },
+    { label: "Generate first routine",hint: "Get a personalised drill plan",                 done: state.routineGenerated, action: () => setPlanMode("generated") },
+    { label: "Complete first session",hint: "Mark your first session done",                  done: state.sessionCompleted, action: () => {
       const active = savedRoutines.find(r => { const p = routineProgress(r); return p.pct < 100 && p.total > 0; });
       if (active) { currentRoutine = active; renderRoutine(active); hydrateForm(active.profileSnapshot); routineTitleInput.value = active.title || ""; setPlanMode("generated"); }
       else setPlanMode("generated");
@@ -902,12 +947,25 @@ function renderOnboardingChecklist(state) {
   steps.forEach((step, i) => {
     const isCurrent = !step.done && !currentFound;
     if (isCurrent) currentFound = true;
+    const isLocked = !step.done && !isCurrent;
+
     const el = document.createElement("button");
     el.type = "button";
-    el.className = "checklist-step" + (step.done ? " done" : "") + (isCurrent ? " current" : "");
+    el.className = [
+      "checklist-step",
+      step.done  ? "done"   : "",
+      isCurrent  ? "current": "",
+      isLocked   ? "locked" : "",
+    ].filter(Boolean).join(" ");
+
+    el.disabled = isLocked;
     el.innerHTML = `
       <span class="checklist-num">${step.done ? "&#10003;" : i + 1}</span>
-      <span class="checklist-label">${step.label}</span>`;
+      <span class="checklist-body">
+        <span class="checklist-label">${step.label}</span>
+        <span class="checklist-hint">${step.done ? "Done" : step.hint}</span>
+      </span>
+      ${isCurrent ? '<span class="checklist-arrow">&#8594;</span>' : ""}`;
     el.addEventListener("click", step.action);
     homeChecklistSteps.appendChild(el);
   });
@@ -966,35 +1024,181 @@ function renderTodayTrainingCard() {
   if (!next) { homeTodayCard.innerHTML = ""; return; }
 
   const prog = routineProgress(activeRoutine);
-  const drillsHtml = (next.session.bullets || []).map(b => {
-    const bulletText = b.replace(/^\d+\s*min\s*/, "");
-    const duration = b.match(/^(\d+\s*min)/);
+  const bullets = next.session.bullets || [];
+
+  // Sum durations for total time display
+  let totalMins = 0;
+  const drillsHtml = bullets.map(b => {
+    const durationMatch = b.match(/^(\d+)\s*min/);
+    const mins = durationMatch ? parseInt(durationMatch[1], 10) : 0;
+    totalMins += mins;
+    const drillText = b.replace(/^\d+\s*min\s*[–-]?\s*/, "");
     return `<div class="today-drill-row">
-      ${duration ? `<span class="today-drill-dur">${duration[1]}</span>` : ""}
-      <span class="today-drill-name">${bulletText}</span>
+      <span class="today-drill-dur">${mins > 0 ? mins + "m" : ""}</span>
+      <span class="today-drill-name">${drillText}</span>
     </div>`;
   }).join("");
 
+  const totalLabel = totalMins > 0 ? `${totalMins} min` : "";
+  const weekNum = next.weekIndex + 1;
+  const sessNum = next.sessionIndex + 1;
+
   homeTodayCard.innerHTML = `
     <div class="today-header">
-      <h3>Today's Training</h3>
-      <span class="today-routine-name">${activeRoutine.title}</span>
+      <div class="today-header-left">
+        <span class="today-eyebrow">Today's Training</span>
+        <h3 class="today-session-title">${next.session.title || `Week ${weekNum}, Session ${sessNum}`}</h3>
+        <span class="today-meta">Week ${weekNum} &middot; Session ${sessNum}${totalLabel ? " &middot; " + totalLabel : ""}</span>
+      </div>
+      <span class="today-routine-badge">${activeRoutine.title}</span>
     </div>
-    <div class="today-session-title">${next.session.title}</div>
     <div class="today-drills">${drillsHtml}</div>
     <div class="today-footer">
-      <div class="saved-progress-wrap"><div class="saved-progress-bar" style="width:${prog.pct}%"></div></div>
-      <span class="today-progress-text">${prog.done}/${prog.total} sessions</span>
-      <button class="btn btn-primary today-start-btn" type="button">Start Session</button>
+      <div class="today-footer-progress">
+        <div class="today-progress-label">
+          <span>Routine progress</span>
+          <span>${prog.done}/${prog.total} sessions</span>
+        </div>
+        <div class="saved-progress-wrap"><div class="saved-progress-bar" style="width:${prog.pct}%"></div></div>
+      </div>
+      <button class="btn btn-brand today-start-btn" type="button">
+        Start Session${totalLabel ? " &middot; " + totalLabel : ""}
+      </button>
     </div>`;
   homeTodayCard.querySelector(".today-start-btn").addEventListener("click", () => {
-    currentRoutine = activeRoutine;
-    renderRoutine(activeRoutine);
-    hydrateForm(activeRoutine.profileSnapshot);
-    routineTitleInput.value = activeRoutine.title || "";
-    setPlanMode("generated");
+    enterSessionRunner(activeRoutine, next);
   });
 }
+
+// ===== Inline Session Runner =====
+
+function enterSessionRunner(routine, next) {
+  // Initialise (or resume) runner state
+  const bullets = next.session.bullets || [];
+  if (
+    !runnerState ||
+    runnerState.routine.id !== routine.id ||
+    runnerState.key !== next.key
+  ) {
+    runnerState = {
+      routine,
+      weekIndex: next.weekIndex,
+      sessionIndex: next.sessionIndex,
+      key: next.key,
+      drillChecked: bullets.map(() => false),
+    };
+  }
+
+  // Swap views: hide dashboard, show runner
+  homeOnboarding.classList.add("hidden");
+  homeDashboard.classList.add("hidden");
+  homeSessionRunner.classList.remove("hidden");
+
+  renderRunnerUI();
+}
+
+function exitSessionRunner() {
+  runnerState = null;
+  homeSessionRunner.classList.add("hidden");
+  renderHomeDashboard();
+}
+
+function renderRunnerUI() {
+  if (!runnerState) return;
+
+  const { routine, weekIndex, sessionIndex, key, drillChecked } = runnerState;
+  const session = routine.weeks[weekIndex].sessions[sessionIndex];
+  const bullets = session.bullets || [];
+  const weekNum = weekIndex + 1;
+  const sessNum = sessionIndex + 1;
+
+  // Compute total time
+  let totalMins = 0;
+  bullets.forEach(b => {
+    const m = b.match(/^(\d+)\s*min/);
+    if (m) totalMins += parseInt(m[1], 10);
+  });
+  const totalLabel = totalMins > 0 ? ` · ${totalMins} min` : "";
+
+  // Header
+  runnerHeader.innerHTML = `
+    <span class="runner-eyebrow">Week ${weekNum} &middot; Session ${sessNum}${totalLabel}</span>
+    <h2 class="runner-title">${session.title || `Session ${sessNum}`}</h2>
+    <span class="runner-routine-badge">${routine.title}</span>`;
+
+  // Drill rows
+  runnerDrills.innerHTML = "";
+  bullets.forEach((bullet, i) => {
+    const durationMatch = bullet.match(/^(\d+)\s*min/);
+    const mins = durationMatch ? parseInt(durationMatch[1], 10) : 0;
+    const drillText = bullet.replace(/^\d+\s*min\s*[–-]?\s*/, "");
+    const checked = drillChecked[i];
+
+    const row = document.createElement("label");
+    row.className = "runner-drill-row" + (checked ? " checked" : "");
+    row.htmlFor = `runner-drill-${i}`;
+
+    // Try to match drill in cache for "View" link
+    const drillMatch = drillLibraryCache
+      ? drillLibraryCache.find(d => drillText.includes(d.name))
+      : null;
+
+    row.innerHTML = `
+      <input class="runner-drill-cb" type="checkbox" id="runner-drill-${i}" ${checked ? "checked" : ""}>
+      <span class="runner-drill-info">
+        <span class="runner-drill-name">${drillText}</span>
+        ${drillMatch ? `<button class="btn btn-ghost runner-view-btn" type="button" data-drill-i="${i}">View drill</button>` : ""}
+      </span>
+      <span class="runner-drill-dur">${mins > 0 ? mins + "m" : ""}</span>`;
+
+    row.querySelector(".runner-drill-cb").addEventListener("change", (e) => {
+      runnerState.drillChecked[i] = e.target.checked;
+      row.classList.toggle("checked", e.target.checked);
+      updateRunnerProgress();
+    });
+
+    if (drillMatch) {
+      row.querySelector(".runner-view-btn").addEventListener("click", (e) => {
+        e.preventDefault();
+        openDrillModal(drillMatch);
+      });
+    }
+
+    runnerDrills.appendChild(row);
+  });
+
+  updateRunnerProgress();
+}
+
+function updateRunnerProgress() {
+  if (!runnerState) return;
+  const { drillChecked } = runnerState;
+  const total = drillChecked.length;
+  const done = drillChecked.filter(Boolean).length;
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+
+  runnerProgressText.textContent = `${done} / ${total} drill${total !== 1 ? "s" : ""}`;
+  runnerProgressPct.textContent = `${pct}%`;
+  runnerProgressBar.style.width = `${pct}%`;
+  runnerCompleteBtn.disabled = done < total;
+}
+
+// Wire up back button and complete button (once, not per render)
+runnerBackBtn.addEventListener("click", exitSessionRunner);
+
+runnerCompleteBtn.addEventListener("click", async () => {
+  if (!runnerState) return;
+  const { routine, key, weekIndex } = runnerState;
+  const weekTotal = routine.weeks[weekIndex]?.sessions?.length || 0;
+  runnerCompleteBtn.disabled = true;
+  runnerCompleteBtn.textContent = "Saving…";
+
+  await toggleCompletion(routine.id, key, weekIndex, weekTotal);
+
+  // toggleCompletion updates savedRoutines and may open the reflection modal.
+  // Exit runner after — reflection modal sits on top and closes independently.
+  exitSessionRunner();
+});
 
 function renderHomeProgress() {
   let completedSessions = 0;
@@ -1360,6 +1564,10 @@ function renderRoutine(routine) {
   const isSaved = Boolean(routine.id);
   saveRoutineBtn.textContent = isSaved ? "Update Routine" : "Save to Profile";
 
+  // Pre-compute next incomplete session key so we can highlight it in the list
+  const nextIncomplete = isSaved ? getNextIncompleteSession(routine) : null;
+  const nextKey = nextIncomplete ? nextIncomplete.key : null;
+
   routineWeeks.innerHTML = "";
   routine.weeks.forEach((week, wi) => {
     const block = document.createElement("section");
@@ -1390,8 +1598,9 @@ function renderRoutine(routine) {
       const done = Boolean(completions[key]);
       if (done) weekDone += 1;
 
+      const isNext = key === nextKey;
       const card = document.createElement("div");
-      card.className = "session-card" + (done ? " completed" : "");
+      card.className = "session-card" + (done ? " completed" : "") + (isNext ? " next-session" : "");
       if (isSaved) card.setAttribute("data-drag-idx", si);
 
       // Header with drag handle, checkbox, and title
@@ -1429,6 +1638,23 @@ function renderRoutine(routine) {
         badge.className = "session-reflection-badge";
         badge.innerHTML = `<span class="badge-stars">${"\u2605".repeat(ref.rating)}</span>`;
         header.appendChild(badge);
+      }
+
+      // "Start Session" CTA on the next incomplete session
+      if (isNext) {
+        const startBtn = document.createElement("button");
+        startBtn.type = "button";
+        startBtn.className = "btn btn-brand btn-sm session-start-btn";
+        startBtn.textContent = "Start";
+        startBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          // Enter the inline runner if available, else stay on plan tab
+          if (typeof enterSessionRunner === "function") {
+            enterSessionRunner(routine, nextIncomplete);
+            setPlanMode("home");
+          }
+        });
+        header.appendChild(startBtn);
       }
 
       card.appendChild(header);
@@ -1894,6 +2120,10 @@ showGeneratedRoutineBtn.addEventListener("click", () => setPlanMode("generated")
 showCustomRoutineBtn.addEventListener("click", () => setPlanMode("custom"));
 showDrillLibraryBtn.addEventListener("click", () => setPlanMode("drills"));
 showStatsBtn.addEventListener("click", () => setPlanMode("stats"));
+
+// Plan tab segmented control
+planSegGenerated.addEventListener("click", () => setPlanSubmode("generated"));
+planSegCustom.addEventListener("click", () => setPlanSubmode("custom"));
 
 // Home dashboard event listeners are attached dynamically in render functions
 

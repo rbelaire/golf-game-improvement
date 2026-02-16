@@ -2,7 +2,7 @@
 <html lang="en" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
     <title>thegolfbuild</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="manifest" href="/manifest.webmanifest" />
@@ -138,6 +138,29 @@
           <div id="homeQuickActions" class="home-quick-actions"></div>
           <div id="homeRecentRoutines" class="home-recent-routines"></div>
         </div>
+
+        <!-- Inline session runner (takes over home panel) -->
+        <div id="homeSessionRunner" class="home-session-runner hidden">
+          <div class="runner-back-row">
+            <button id="runnerBackBtn" class="btn btn-ghost" type="button">&#8592; Back</button>
+          </div>
+          <div id="runnerHeader" class="runner-header"></div>
+          <div id="runnerDrills" class="runner-drills"></div>
+          <div class="runner-footer">
+            <div class="runner-progress-wrap">
+              <div class="runner-progress-label">
+                <span id="runnerProgressText">0 / 0 drills</span>
+                <span id="runnerProgressPct">0%</span>
+              </div>
+              <div class="saved-progress-wrap runner-bar-wrap">
+                <div id="runnerProgressBar" class="saved-progress-bar" style="width:0%"></div>
+              </div>
+            </div>
+            <button id="runnerCompleteBtn" class="btn btn-brand runner-complete-btn" type="button" disabled>
+              Complete Session
+            </button>
+          </div>
+        </div>
       </section>
 
       <section id="authPanel" class="panel auth-panel">
@@ -174,7 +197,16 @@
       </section>
 
       <section class="panel plan-panel">
-        <h2 id="planPanelTitle">Generated Practice Routine</h2>
+        <h2 id="planPanelTitle" class="sr-only">Practice Routine</h2>
+
+        <!-- Plan tab segmented control -->
+        <div class="segmented-control plan-seg" id="planSegControl" role="tablist">
+          <button class="seg-btn active" id="planSegGenerated" type="button" role="tab" aria-selected="true">Generated</button>
+          <button class="seg-btn" id="planSegCustom" type="button" role="tab" aria-selected="false">Custom</button>
+        </div>
+
+        <!-- Generated mode wrapper -->
+        <div id="planGeneratedView">
 
         <div id="profileSummary" class="profile-summary hidden">
           <div class="profile-summary-tags">
@@ -299,6 +331,8 @@
             <div id="routineWeeks" class="routine-weeks"></div>
           </article>
         </div>
+        </div><!-- /planGeneratedView -->
+
         <div id="customRoutineView" class="hidden">
           <div class="panel-subsection custom-subsection">
             <h3>Custom Routine Builder</h3>
@@ -382,7 +416,7 @@
 
       <section id="drillLibraryPanel" class="panel drill-library-panel hidden">
         <h2>Drill Library</h2>
-        <p class="plan-mode-note">Browse all 120 drills grouped by weakness category. Click any drill to expand its description.</p>
+        <p class="plan-mode-note">Browse all 330 drills grouped by weakness category. Click any drill to expand its description.</p>
         <div class="drill-search-bar">
           <input type="text" id="drillSearchInput" placeholder="Search drills..." />
           <p id="drillResultCount" class="drill-result-count"></p>
