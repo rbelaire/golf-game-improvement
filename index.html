@@ -118,41 +118,25 @@
 
     <main class="layout">
       <section id="homePanel" class="panel home-panel hidden">
-        <div class="home-welcome">
-          <h2 id="homeGreeting">Welcome to thegolfbuild</h2>
-          <p id="homeSubtitle" class="plan-mode-note">Build personalized practice routines backed by a smart rules engine.</p>
-        </div>
-
-        <div id="homeStatsRow" class="home-stats-row hidden">
-          <div class="stat-card">
-            <p class="stat-value" id="homeStatRoutines">-</p>
-            <p class="stat-label">Saved</p>
+        <!-- Onboarding view (new/incomplete users) -->
+        <div id="homeOnboarding" class="home-onboarding hidden">
+          <div class="home-hero">
+            <h2>Build your best practice plan</h2>
+            <p class="plan-mode-note">A smarter way to practice golf. Set up your profile, generate a personalized routine, and track your progress.</p>
           </div>
-          <div class="stat-card">
-            <p class="stat-value" id="homeStatCompleted">-</p>
-            <p class="stat-label">Done</p>
-          </div>
-          <div class="stat-card">
-            <p class="stat-value" id="homeStatStreak">-</p>
-            <p class="stat-label">Streak</p>
+          <div class="home-checklist">
+            <h3>Getting Started</h3>
+            <div id="homeChecklistSteps"></div>
           </div>
         </div>
 
-        <div id="homeActiveRoutine" class="home-active-routine hidden">
-          <h3>Continue Training</h3>
-          <div id="homeActiveRoutineCard"></div>
-        </div>
-
-        <div class="home-actions">
-          <button id="homeGenerateBtn" class="btn btn-primary home-action-btn" type="button">Generate Routine</button>
-          <button id="homeCustomBtn" class="btn btn-outline home-action-btn" type="button">Build Custom</button>
-          <button id="homeSavedBtn" class="btn btn-outline home-action-btn" type="button">My Routines</button>
-          <button id="homeDrillsBtn" class="btn btn-outline home-action-btn" type="button">Browse Drills</button>
-        </div>
-
-        <div id="homeNewUserWrap" class="home-new-user-wrap hidden">
-          <p class="plan-mode-note">Get started by setting up your profile and generating your first routine.</p>
-          <button id="homeGetStartedBtn" class="btn btn-primary" type="button">Set Up Profile</button>
+        <!-- Full dashboard (returning users) -->
+        <div id="homeDashboard" class="home-dashboard hidden">
+          <div id="homeProfileBar" class="home-profile-bar"></div>
+          <div id="homeTodayCard" class="home-today-card"></div>
+          <div id="homeProgressGrid" class="home-progress-grid"></div>
+          <div id="homeQuickActions" class="home-quick-actions"></div>
+          <div id="homeRecentRoutines" class="home-recent-routines"></div>
         </div>
       </section>
 

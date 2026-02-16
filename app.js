@@ -75,12 +75,14 @@ const onboardingOverlay = document.getElementById("onboardingOverlay");
 
 const showHomeBtn = document.getElementById("showHomeBtn");
 const homePanel = document.getElementById("homePanel");
-const homeGreeting = document.getElementById("homeGreeting");
-const homeSubtitle = document.getElementById("homeSubtitle");
-const homeStatsRow = document.getElementById("homeStatsRow");
-const homeActiveRoutine = document.getElementById("homeActiveRoutine");
-const homeActiveRoutineCard = document.getElementById("homeActiveRoutineCard");
-const homeNewUserWrap = document.getElementById("homeNewUserWrap");
+const homeOnboarding = document.getElementById("homeOnboarding");
+const homeDashboard = document.getElementById("homeDashboard");
+const homeChecklistSteps = document.getElementById("homeChecklistSteps");
+const homeProfileBar = document.getElementById("homeProfileBar");
+const homeTodayCard = document.getElementById("homeTodayCard");
+const homeProgressGrid = document.getElementById("homeProgressGrid");
+const homeQuickActions = document.getElementById("homeQuickActions");
+const homeRecentRoutines = document.getElementById("homeRecentRoutines");
 
 const themeToggleBtn = document.getElementById("themeToggleBtn");
 const themeIcon = document.getElementById("themeIcon");
@@ -828,65 +830,274 @@ function setPlanMode(mode) {
   updateEmptyState();
 }
 
-function renderHomeDashboard() {
-  const isAuthed = Boolean(currentUser);
+function getOnboardingState() {
+  const signedUp = Boolean(currentUser);
+  const profile = signedUp ? getCachedProfile(currentUser.id) : null;
+  const profileDone = profile ? isProfileComplete(profile) : false;
+  const routineGenerated = savedRoutines.length > 0;
+  let sessionCompleted = false;
+  for (const r of savedRoutines) {
+    if (Object.keys(r.completions || {}).length > 0) { sessionCompleted = true; break; }
+  }
+  const allDone = signedUp && profileDone && routineGenerated && sessionCompleted;
+  return { signedUp, profileDone, routineGenerated, sessionCompleted, allDone, profile };
+}
 
-  if (isAuthed) {
-    homeGreeting.textContent = `Welcome back, ${getDisplayFirstName()}`;
-    homeSubtitle.textContent = "Here's your training overview.";
-    homeNewUserWrap.classList.add("hidden");
-    homeStatsRow.classList.remove("hidden");
-
-    const totalRoutines = savedRoutines.length;
-    let completedSessions = 0;
-    for (const r of savedRoutines) {
-      completedSessions += Object.keys(r.completions || {}).length;
+function getNextIncompleteSession(routine) {
+  const completions = routine.completions || {};
+  for (let wi = 0; wi < (routine.weeks || []).length; wi++) {
+    const week = routine.weeks[wi];
+    for (let si = 0; si < (week.sessions || []).length; si++) {
+      const key = `${wi}-${si}`;
+      if (!completions[key]) return { week, weekIndex: wi, session: week.sessions[si], sessionIndex: si, key };
     }
-    document.getElementById("homeStatRoutines").textContent = totalRoutines;
-    document.getElementById("homeStatCompleted").textContent = completedSessions;
-    document.getElementById("homeStatStreak").textContent = "-";
+  }
+  return null;
+}
 
-    api("/api/stats").then((result) => {
-      document.getElementById("homeStatStreak").textContent = (result.stats.currentStreak || 0) + "d";
-    }).catch(() => {});
+function countThisWeekSessions() {
+  const now = new Date();
+  const day = now.getDay();
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - ((day + 6) % 7));
+  monday.setHours(0, 0, 0, 0);
+  const weekStart = monday.toISOString();
+  let count = 0;
+  for (const r of savedRoutines) {
+    for (const val of Object.values(r.completions || {})) {
+      if (typeof val === "string" && val >= weekStart) count++;
+    }
+  }
+  return count;
+}
 
-    const activeRoutine = savedRoutines.find((r) => {
-      const prog = routineProgress(r);
-      return prog.pct < 100 && prog.total > 0;
+function renderHomeDashboard() {
+  const state = getOnboardingState();
+
+  if (state.allDone) {
+    homeOnboarding.classList.add("hidden");
+    homeDashboard.classList.remove("hidden");
+    renderDashboardHub(state);
+  } else {
+    homeOnboarding.classList.remove("hidden");
+    homeDashboard.classList.add("hidden");
+    renderOnboardingChecklist(state);
+  }
+}
+
+function renderOnboardingChecklist(state) {
+  const steps = [
+    { label: "Create account", done: state.signedUp, action: () => setPlanMode("generated") },
+    { label: "Set up golf profile", done: state.profileDone, action: () => { setPlanMode("generated"); expandProfileForm(); } },
+    { label: "Generate first routine", done: state.routineGenerated, action: () => setPlanMode("generated") },
+    { label: "Complete first session", done: state.sessionCompleted, action: () => {
+      const active = savedRoutines.find(r => { const p = routineProgress(r); return p.pct < 100 && p.total > 0; });
+      if (active) { currentRoutine = active; renderRoutine(active); hydrateForm(active.profileSnapshot); routineTitleInput.value = active.title || ""; setPlanMode("generated"); }
+      else setPlanMode("generated");
+    }}
+  ];
+
+  homeChecklistSteps.innerHTML = "";
+  let currentFound = false;
+  steps.forEach((step, i) => {
+    const isCurrent = !step.done && !currentFound;
+    if (isCurrent) currentFound = true;
+    const el = document.createElement("button");
+    el.type = "button";
+    el.className = "checklist-step" + (step.done ? " done" : "") + (isCurrent ? " current" : "");
+    el.innerHTML = `
+      <span class="checklist-num">${step.done ? "&#10003;" : i + 1}</span>
+      <span class="checklist-label">${step.label}</span>`;
+    el.addEventListener("click", step.action);
+    homeChecklistSteps.appendChild(el);
+  });
+}
+
+function renderDashboardHub(state) {
+  renderHomeProfileBar(state.profile);
+  renderTodayTrainingCard();
+  renderHomeProgress();
+  renderHomeQuickActions();
+  renderHomeRecentRoutines();
+}
+
+function renderHomeProfileBar(profile) {
+  if (!profile) { homeProfileBar.innerHTML = ""; return; }
+  const weaknesses = profile.weaknesses || (profile.weakness ? [profile.weakness] : []);
+  const hrs = profile.hoursPerSession || 1.5;
+  const hrsWhole = Math.floor(hrs);
+  const minsLeft = Math.round((hrs - hrsWhole) * 60);
+  const durationLabel = minsLeft > 0 ? `${hrsWhole}h ${minsLeft}m` : `${hrsWhole}h`;
+  const schedule = `${profile.daysPerWeek || 3}d/wk \u00B7 ${durationLabel}`;
+  homeProfileBar.innerHTML = `
+    <div class="profile-bar-greeting">
+      <h2>Welcome back, ${getDisplayFirstName()}</h2>
+    </div>
+    <div class="profile-bar-chips">
+      <span class="profile-chip">${(profile.handicap || "").replace(/\s*\(.*\)/, "")}</span>
+      ${weaknesses.map(w => `<span class="profile-chip">${w}</span>`).join("")}
+      <span class="profile-chip">${schedule}</span>
+    </div>
+    <button id="homeEditProfileBtn" class="btn btn-sm btn-outline" type="button">Edit Profile</button>`;
+  document.getElementById("homeEditProfileBtn").addEventListener("click", () => {
+    setPlanMode("generated");
+    expandProfileForm();
+  });
+}
+
+function renderTodayTrainingCard() {
+  const activeRoutine = savedRoutines.find(r => {
+    const prog = routineProgress(r);
+    return prog.pct < 100 && prog.total > 0;
+  });
+
+  if (!activeRoutine) {
+    homeTodayCard.innerHTML = `
+      <div class="today-empty">
+        <h3>Today's Training</h3>
+        <p class="plan-mode-note">No active routine. Generate one to get started!</p>
+        <button class="btn btn-primary today-generate-btn" type="button">Generate Routine</button>
+      </div>`;
+    homeTodayCard.querySelector(".today-generate-btn").addEventListener("click", () => setPlanMode("generated"));
+    return;
+  }
+
+  const next = getNextIncompleteSession(activeRoutine);
+  if (!next) { homeTodayCard.innerHTML = ""; return; }
+
+  const prog = routineProgress(activeRoutine);
+  const drillsHtml = (next.session.bullets || []).map(b => {
+    const bulletText = b.replace(/^\d+\s*min\s*/, "");
+    const duration = b.match(/^(\d+\s*min)/);
+    return `<div class="today-drill-row">
+      ${duration ? `<span class="today-drill-dur">${duration[1]}</span>` : ""}
+      <span class="today-drill-name">${bulletText}</span>
+    </div>`;
+  }).join("");
+
+  homeTodayCard.innerHTML = `
+    <div class="today-header">
+      <h3>Today's Training</h3>
+      <span class="today-routine-name">${activeRoutine.title}</span>
+    </div>
+    <div class="today-session-title">${next.session.title}</div>
+    <div class="today-drills">${drillsHtml}</div>
+    <div class="today-footer">
+      <div class="saved-progress-wrap"><div class="saved-progress-bar" style="width:${prog.pct}%"></div></div>
+      <span class="today-progress-text">${prog.done}/${prog.total} sessions</span>
+      <button class="btn btn-primary today-start-btn" type="button">Start Session</button>
+    </div>`;
+  homeTodayCard.querySelector(".today-start-btn").addEventListener("click", () => {
+    currentRoutine = activeRoutine;
+    renderRoutine(activeRoutine);
+    hydrateForm(activeRoutine.profileSnapshot);
+    routineTitleInput.value = activeRoutine.title || "";
+    setPlanMode("generated");
+  });
+}
+
+function renderHomeProgress() {
+  let completedSessions = 0;
+  for (const r of savedRoutines) {
+    completedSessions += Object.keys(r.completions || {}).length;
+  }
+  const thisWeek = countThisWeekSessions();
+
+  const activeRoutine = savedRoutines.find(r => {
+    const p = routineProgress(r);
+    return p.pct < 100 && p.total > 0;
+  });
+  const prog = activeRoutine ? routineProgress(activeRoutine) : { done: 0, total: 0, pct: 0 };
+
+  homeProgressGrid.innerHTML = `
+    <div class="stat-card">
+      <p class="stat-value" id="homeStatStreak">-</p>
+      <p class="stat-label">Day Streak</p>
+    </div>
+    <div class="stat-card">
+      <p class="stat-value">${thisWeek}</p>
+      <p class="stat-label">This Week</p>
+    </div>
+    <div class="stat-card">
+      <p class="stat-value">${prog.pct}%</p>
+      <p class="stat-label">Routine Progress</p>
+      <div class="saved-progress-wrap progress-sm"><div class="saved-progress-bar" style="width:${prog.pct}%"></div></div>
+    </div>`;
+
+  api("/api/stats").then((result) => {
+    const el = document.getElementById("homeStatStreak");
+    if (el) el.textContent = (result.stats.currentStreak || 0) + "d";
+  }).catch(() => {});
+}
+
+function renderHomeQuickActions() {
+  const hasActive = savedRoutines.some(r => {
+    const p = routineProgress(r);
+    return p.pct < 100 && p.total > 0;
+  });
+  const allDoneRoutines = savedRoutines.length > 0 && !hasActive;
+
+  let buttons = "";
+  if (savedRoutines.length === 0) {
+    buttons = `
+      <button class="btn btn-primary home-qa-btn" data-action="generate">Generate Routine</button>
+      <button class="btn btn-outline home-qa-btn" data-action="drills">Browse Drills</button>`;
+  } else if (allDoneRoutines) {
+    buttons = `
+      <button class="btn btn-primary home-qa-btn" data-action="generate">Generate New</button>
+      <button class="btn btn-outline home-qa-btn" data-action="stats">View Stats</button>
+      <button class="btn btn-outline home-qa-btn" data-action="drills">Browse Drills</button>`;
+  } else {
+    buttons = `
+      <button class="btn btn-outline home-qa-btn" data-action="custom">Build Custom</button>
+      <button class="btn btn-outline home-qa-btn" data-action="drills">Browse Drills</button>`;
+  }
+
+  homeQuickActions.innerHTML = buttons;
+  homeQuickActions.querySelectorAll(".home-qa-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const action = btn.dataset.action;
+      if (action === "generate") setPlanMode("generated");
+      else if (action === "custom") setPlanMode("custom");
+      else if (action === "drills") setPlanMode("drills");
+      else if (action === "stats") setPlanMode("stats");
     });
+  });
+}
 
-    if (activeRoutine) {
-      homeActiveRoutine.classList.remove("hidden");
-      const prog = routineProgress(activeRoutine);
-      homeActiveRoutineCard.innerHTML = "";
-      const card = document.createElement("div");
-      card.className = "home-active-card";
-      card.innerHTML = `
-        <div class="home-active-info">
-          <p class="saved-title">${activeRoutine.title}</p>
-          <p class="saved-meta">${activeRoutine.meta}</p>
+function renderHomeRecentRoutines() {
+  if (savedRoutines.length === 0) { homeRecentRoutines.innerHTML = ""; return; }
+
+  const recent = savedRoutines.slice(-3).reverse();
+  let html = "<h3>Recent Routines</h3>";
+  recent.forEach(r => {
+    const prog = routineProgress(r);
+    html += `
+      <div class="home-recent-card" data-id="${r.id}">
+        <div class="home-recent-info">
+          <p class="saved-title">${r.title}</p>
+          <p class="saved-meta">${r.meta || ""}</p>
           <div class="saved-progress-wrap"><div class="saved-progress-bar" style="width:${prog.pct}%"></div></div>
           <p class="saved-progress-text">${prog.done}/${prog.total} sessions (${prog.pct}%)</p>
         </div>
-        <button class="btn btn-primary" type="button">Continue</button>`;
-      card.querySelector(".btn").addEventListener("click", () => {
-        currentRoutine = activeRoutine;
-        renderRoutine(currentRoutine);
-        hydrateForm(activeRoutine.profileSnapshot);
-        routineTitleInput.value = activeRoutine.title || "";
+        <button class="btn btn-sm btn-outline home-recent-open" type="button">Open</button>
+      </div>`;
+  });
+  homeRecentRoutines.innerHTML = html;
+
+  homeRecentRoutines.querySelectorAll(".home-recent-open").forEach(btn => {
+    const card = btn.closest(".home-recent-card");
+    const routine = savedRoutines.find(r => r.id === card.dataset.id);
+    if (routine) {
+      btn.addEventListener("click", () => {
+        currentRoutine = routine;
+        renderRoutine(routine);
+        hydrateForm(routine.profileSnapshot);
+        routineTitleInput.value = routine.title || "";
         setPlanMode("generated");
       });
-      homeActiveRoutineCard.appendChild(card);
-    } else {
-      homeActiveRoutine.classList.add("hidden");
     }
-  } else {
-    homeGreeting.textContent = "Welcome to thegolfbuild";
-    homeSubtitle.textContent = "Build personalized practice routines backed by a smart rules engine.";
-    homeStatsRow.classList.add("hidden");
-    homeActiveRoutine.classList.add("hidden");
-    homeNewUserWrap.classList.remove("hidden");
-  }
+  });
 }
 
 function getProfileFromForm() {
@@ -1684,13 +1895,7 @@ showCustomRoutineBtn.addEventListener("click", () => setPlanMode("custom"));
 showDrillLibraryBtn.addEventListener("click", () => setPlanMode("drills"));
 showStatsBtn.addEventListener("click", () => setPlanMode("stats"));
 
-document.getElementById("homeGenerateBtn").addEventListener("click", () => setPlanMode("generated"));
-document.getElementById("homeCustomBtn").addEventListener("click", () => setPlanMode("custom"));
-document.getElementById("homeSavedBtn").addEventListener("click", () => {
-  requireAuth("Sign in to view routines", () => openRoutineSwitcher());
-});
-document.getElementById("homeDrillsBtn").addEventListener("click", () => setPlanMode("drills"));
-document.getElementById("homeGetStartedBtn").addEventListener("click", () => setPlanMode("generated"));
+// Home dashboard event listeners are attached dynamically in render functions
 
 // Handicap button group — single select
 document.querySelectorAll("#handicapGroup .btn-toggle").forEach(btn => {
