@@ -205,25 +205,6 @@ function upsertJsonLd(html, id, payload) {
   return html.replace("</head>", `  ${tag}\n</head>`);
 }
 
-function forceSectionHidden(html, sectionId) {
-  const regex = new RegExp(`(<section\\s+id=["']${sectionId}["'][^>]*class=["'])([^"']*)(["'][^>]*>)`, "i");
-  return html.replace(regex, (_m, start, classes, end) => {
-    const nextClasses = classes.includes("hidden") ? classes : `${classes} hidden`.trim();
-    return `${start}${nextClasses}${end}`;
-  }).replace(
-    new RegExp(`(<section\\s+id=["']${sectionId}["'][^>]*)(>)`, "i"),
-    "$1 hidden$2"
-  );
-}
-
-function forceButtonHidden(html, buttonId) {
-  const regex = new RegExp(`(<button\\s+id=["']${buttonId}["'][^>]*class=["'])([^"']*)(["'][^>]*>)`, "i");
-  return html.replace(regex, (_m, start, classes, end) => {
-    const nextClasses = classes.includes("hidden") ? classes : `${classes} hidden`.trim();
-    return `${start}${nextClasses}${end}`;
-  });
-}
-
 function buildSeoPayload(pathname) {
   const normalized = normalizeRoutePath(pathname);
   const routeSeo = PUBLIC_SEO_ROUTES[normalized];
@@ -290,11 +271,6 @@ function renderPublicShell(pathname) {
   html = upsertMetaByName(html, "twitter:description", seo.description);
   html = upsertMetaByName(html, "twitter:image", seo.ogImage);
   html = upsertJsonLd(html, "seo-jsonld", seo.jsonLd);
-
-  // Public shells should never present account/admin panels before app auth state loads.
-  html = forceSectionHidden(html, "authPanel");
-  html = forceSectionHidden(html, "adminPanel");
-  html = forceButtonHidden(html, "showAdminBtn");
 
   if (seo.intro) {
     html = html.replace("<body>", `<body>\n${seo.intro}`);
@@ -870,10 +846,7 @@ async function requestHandler(req, res, options = {}) {
   const hasFileExtension = path.extname(url.pathname) !== "";
   if (req.method === "GET" && !hasFileExtension) {
     const html = renderPublicShell(url.pathname);
-    res.writeHead(200, {
-      "Content-Type": "text/html; charset=utf-8",
-      "Cache-Control": "no-cache, no-store, must-revalidate"
-    });
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
     res.end(html);
     return;
   }
