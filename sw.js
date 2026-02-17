@@ -1,4 +1,4 @@
-const CACHE_NAME = "golfbuild-v8";
+const CACHE_NAME = "golfbuild-v7";
 const STATIC_ASSETS = [
   "/",
   "/index.html",
@@ -17,24 +17,6 @@ const APP_SHELL_PATHS = new Set([
   "/styles.css",
   "/manifest.webmanifest"
 ]);
-
-function getContentType(response) {
-  return (response.headers.get("content-type") || "").toLowerCase();
-}
-
-function isValidForRequest(request, response) {
-  if (!response || !response.ok) return false;
-  const url = new URL(request.url);
-  const ct = getContentType(response);
-
-  if (request.mode === "navigate") {
-    return ct.includes("text/html");
-  }
-  if (url.pathname.endsWith(".css")) return ct.includes("text/css");
-  if (url.pathname.endsWith(".js")) return ct.includes("javascript");
-  if (url.pathname.endsWith(".webmanifest")) return ct.includes("json") || ct.includes("manifest");
-  return true;
-}
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -61,7 +43,7 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       fetch(event.request)
         .then((response) => {
-          if (isValidForRequest(event.request, response)) {
+          if (response.ok) {
             const clone = response.clone();
             caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
           }
@@ -82,7 +64,7 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       fetch(event.request)
         .then((response) => {
-          if (isValidForRequest(event.request, response)) {
+          if (response.ok && event.request.method === "GET") {
             const clone = response.clone();
             caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
           }
@@ -98,7 +80,7 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       fetch(event.request)
         .then((response) => {
-          if (isValidForRequest(event.request, response)) {
+          if (response.ok) {
             const clone = response.clone();
             caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
           }
@@ -115,14 +97,14 @@ self.addEventListener("fetch", (event) => {
       if (cached) {
         // Update cache in background
         fetch(event.request).then((response) => {
-          if (isValidForRequest(event.request, response)) {
+          if (response.ok) {
             caches.open(CACHE_NAME).then((cache) => cache.put(event.request, response));
           }
         }).catch(() => {});
         return cached;
       }
       return fetch(event.request).then((response) => {
-        if (isValidForRequest(event.request, response)) {
+        if (response.ok) {
           const clone = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
         }
