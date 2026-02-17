@@ -113,6 +113,9 @@
       <button id="showStatsBtn" class="tab-btn" type="button">
         <span class="tab-icon">&#9670;</span><span class="tab-label">Stats</span>
       </button>
+      <button id="showAdminBtn" class="tab-btn hidden" type="button">
+        <span class="tab-icon">&#9881;</span><span class="tab-label">Admin</span>
+      </button>
     </nav>
 
     <main class="layout">
@@ -483,6 +486,31 @@
             <h3>Weakness Coverage</h3>
             <div id="statWeakness" class="weakness-chart"></div>
           </div>
+        </div>
+      </section>
+
+      <section id="adminPanel" class="panel stats-panel hidden">
+        <h2>Admin</h2>
+        <p class="plan-mode-note">Registered users</p>
+        <div class="usage-row">
+          <p id="adminUserCount" class="usage-text">-</p>
+          <button id="adminRefreshBtn" class="btn btn-outline btn-sm" type="button">Refresh</button>
+        </div>
+        <div class="admin-table-wrap">
+          <table class="admin-table" id="adminUsersTable">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Plan</th>
+                <th>Role</th>
+                <th>Routines</th>
+              </tr>
+            </thead>
+            <tbody id="adminUsersBody">
+              <tr><td colspan="5" class="admin-empty">No users loaded.</td></tr>
+            </tbody>
+          </table>
         </div>
       </section>
 

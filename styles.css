@@ -1626,6 +1626,37 @@ input.routine-title:focus {
   font: 600 1rem "Rajdhani", sans-serif;
 }
 
+.admin-table-wrap {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: auto;
+  background: var(--card-bg);
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 560px;
+}
+
+.admin-table th,
+.admin-table td {
+  text-align: left;
+  padding: 0.65rem 0.75rem;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.86rem;
+}
+
+.admin-table th {
+  color: var(--muted);
+  font-weight: 600;
+  background: var(--card-glass);
+}
+
+.admin-empty {
+  color: var(--muted);
+}
+
 /* ===== Progress Bars ===== */
 .progress-bar-wrap,
 .saved-progress-wrap {

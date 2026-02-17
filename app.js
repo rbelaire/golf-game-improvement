@@ -75,9 +75,14 @@ const changeRoutineBtn = document.getElementById("changeRoutineBtn");
 
 const showDrillLibraryBtn = document.getElementById("showDrillLibraryBtn");
 const showStatsBtn = document.getElementById("showStatsBtn");
+const showAdminBtn = document.getElementById("showAdminBtn");
 const drillLibraryPanel = document.getElementById("drillLibraryPanel");
 const drillLibraryContent = document.getElementById("drillLibraryContent");
 const statsPanel = document.getElementById("statsPanel");
+const adminPanel = document.getElementById("adminPanel");
+const adminUserCount = document.getElementById("adminUserCount");
+const adminRefreshBtn = document.getElementById("adminRefreshBtn");
+const adminUsersBody = document.getElementById("adminUsersBody");
 const exportPdfBtn = document.getElementById("exportPdfBtn");
 const exportIcalBtn = document.getElementById("exportIcalBtn");
 const toastContainer = document.getElementById("toastContainer");
@@ -963,6 +968,7 @@ function setPlanMode(mode) {
   homePanel.classList.add("hidden");
   drillLibraryPanel.classList.add("hidden");
   statsPanel.classList.add("hidden");
+  adminPanel.classList.add("hidden");
   planPanel.classList.add("hidden");
 
   showHomeBtn.classList.remove("active");
@@ -970,6 +976,7 @@ function setPlanMode(mode) {
   showCustomRoutineBtn?.classList.remove("active");
   showDrillLibraryBtn.classList.remove("active");
   showStatsBtn.classList.remove("active");
+  showAdminBtn?.classList.remove("active");
 
   if (mode === "home") {
     homePanel.classList.remove("hidden");
@@ -989,6 +996,15 @@ function setPlanMode(mode) {
     statsPanel.classList.remove("hidden");
     showStatsBtn.classList.add("active");
     loadStats();
+  } else if (mode === "admin") {
+    if (!currentUser || currentUser.role !== "super") {
+      setMessage("Admin access required.", true);
+      setPlanMode("home");
+      return;
+    }
+    adminPanel.classList.remove("hidden");
+    showAdminBtn?.classList.add("active");
+    loadAdminUsers();
   } else {
     // "generated" and any other value → plan panel library view
     planPanel.classList.remove("hidden");
@@ -997,6 +1013,34 @@ function setPlanMode(mode) {
     renderRoutine();
   }
   updateEmptyState();
+}
+
+async function loadAdminUsers() {
+  if (!adminUsersBody || !adminUserCount) return;
+  adminUsersBody.innerHTML = '<tr><td colspan="5" class="admin-empty">Loading users…</td></tr>';
+  try {
+    const result = await api("/api/admin/users");
+    const users = Array.isArray(result.users) ? result.users : [];
+    adminUserCount.textContent = `${users.length} registered user${users.length === 1 ? "" : "s"}`;
+
+    if (users.length === 0) {
+      adminUsersBody.innerHTML = '<tr><td colspan="5" class="admin-empty">No users found.</td></tr>';
+      return;
+    }
+
+    adminUsersBody.innerHTML = users.map((u) => `
+      <tr>
+        <td>${u.name || "-"}</td>
+        <td>${u.email || "-"}</td>
+        <td>${u.plan || "free"}</td>
+        <td>${u.role || "user"}</td>
+        <td>${Number(u.routineCount || 0)}</td>
+      </tr>
+    `).join("");
+  } catch (err) {
+    adminUserCount.textContent = "Failed to load users";
+    adminUsersBody.innerHTML = `<tr><td colspan="5" class="admin-empty">${err.message || "Failed to load users."}</td></tr>`;
+  }
 }
 
 function getOnboardingState() {
@@ -2542,6 +2586,7 @@ function updateAuthUi() {
   setAuthMode(isAuthed ? false : isRegisterMode);
   authPanel.classList.add("hidden");
   userMenuWrap.classList.toggle("hidden", !isAuthed);
+  showAdminBtn?.classList.toggle("hidden", !(isAuthed && currentUser.role === "super"));
   topSignInBtn.classList.toggle("hidden", isAuthed);
   loadDemoBtn.classList.toggle("hidden", isAuthed);
   if (isAuthed) {
@@ -2710,12 +2755,14 @@ showGeneratedRoutineBtn.addEventListener("click", () => {
 showCustomRoutineBtn?.addEventListener("click", () => setPlanMode("custom"));
 showDrillLibraryBtn.addEventListener("click", () => setPlanMode("drills"));
 showStatsBtn.addEventListener("click", () => setPlanMode("stats"));
+showAdminBtn?.addEventListener("click", () => setPlanMode("admin"));
 openGenerateFlowBtn?.addEventListener("click", () => setRoutineCreateFlow("generated"));
 openCustomFlowBtn?.addEventListener("click", () => setRoutineCreateFlow("custom"));
 closeRoutineCreateFlowBtn?.addEventListener("click", () => {
   setRoutineCreateFlow(null);
   renderRoutine();
 });
+adminRefreshBtn?.addEventListener("click", loadAdminUsers);
 selectedDrillsBtn?.addEventListener("click", () => {
   if (selectedDrillsBtn.disabled) return;
   setPlanMode("generated");
