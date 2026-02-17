@@ -3956,8 +3956,46 @@ function registerServiceWorker() {
   navigator.serviceWorker.register("/sw.js").catch(() => {});
 }
 
+function hasExpectedShellMarkers() {
+  return Boolean(document.querySelector(".topbar")) && Boolean(document.getElementById("homePanel"));
+}
+
+function hasLoadedAppCss() {
+  const bodyStyles = window.getComputedStyle(document.body);
+  const rootStyles = window.getComputedStyle(document.documentElement);
+  const bodyMargin = bodyStyles.marginTop || "";
+  const bgToken = rootStyles.getPropertyValue("--bg").trim();
+  return bodyMargin === "0px" && Boolean(bgToken);
+}
+
+async function runServiceWorkerRecovery() {
+  const guardKey = "thegolfbuild_sw_recovery_v1";
+  if (sessionStorage.getItem(guardKey)) return;
+  if (hasExpectedShellMarkers() && hasLoadedAppCss()) return;
+
+  // Give CSS a short extra window to finish loading on slower iOS startups.
+  await new Promise((resolve) => setTimeout(resolve, 900));
+  if (hasExpectedShellMarkers() && hasLoadedAppCss()) return;
+
+  sessionStorage.setItem(guardKey, "1");
+  try {
+    if ("serviceWorker" in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map((r) => r.unregister()));
+    }
+    if ("caches" in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.filter((k) => k.startsWith("golfbuild-")).map((k) => caches.delete(k)));
+    }
+  } catch (_err) {
+    // Ignore cleanup failures; hard reload still gives network a chance.
+  }
+  window.location.reload();
+}
+
 (async function init() {
   registerServiceWorker();
+  await runServiceWorkerRecovery();
   initOnboarding();
   updateSelectedDrillsBtn();
   setPlanMode("home");
