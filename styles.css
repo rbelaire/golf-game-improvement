@@ -554,8 +554,8 @@ h2 {
 }
 
 .panel-subsection h3 {
-  margin: 0 0 0.7rem;
-  font: 600 1.05rem "Rajdhani", sans-serif;
+  margin: 0 0 0.65rem;
+  font: 600 1rem "Rajdhani", sans-serif;
 }
 
 /* ===== Forms ===== */
@@ -639,7 +639,8 @@ button:disabled {
 
 .btn-toggle {
   flex: 1;
-  padding: 0.6rem 0.5rem;
+  min-height: 40px;
+  padding: 0.55rem 0.6rem;
   border: 1.5px solid var(--line);
   border-radius: 10px;
   background: var(--input-bg);
@@ -649,8 +650,10 @@ button:disabled {
   transition: all 0.15s ease;
 }
 
-.btn-toggle:hover {
+.btn-toggle:hover,
+.btn-toggle:focus-visible {
   border-color: var(--green);
+  color: var(--green);
 }
 
 .btn-toggle.selected {
@@ -667,18 +670,23 @@ button:disabled {
 }
 
 .chip {
-  padding: 0.45rem 0.75rem;
+  min-height: 38px;
+  padding: 0.5rem 0.8rem;
   border: 1.5px solid var(--line);
   border-radius: 20px;
   background: var(--input-bg);
   color: var(--text);
   font: 500 0.82rem "Space Grotesk", sans-serif;
+  display: inline-flex;
+  align-items: center;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
-.chip:hover {
+.chip:hover,
+.chip:focus-visible {
   border-color: var(--green);
+  color: var(--green);
 }
 
 .chip.selected {
@@ -691,7 +699,7 @@ button:disabled {
 .btn {
   border: 1px solid transparent;
   border-radius: 10px;
-  padding: 0.65rem 0.9rem;
+  padding: 0.65rem 1rem;
   font: 600 0.9rem "Space Grotesk", sans-serif;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -713,6 +721,10 @@ button:disabled {
 }
 
 .btn-primary:hover {
+  background: var(--cta-hover);
+}
+
+.btn-primary:focus-visible {
   background: var(--cta-hover);
 }
 
@@ -745,6 +757,10 @@ button:disabled {
 }
 
 .btn-brand:hover {
+  filter: brightness(1.12);
+}
+
+.btn-brand:focus-visible {
   filter: brightness(1.12);
 }
 
@@ -1003,6 +1019,8 @@ input.routine-title:focus {
 .drill-link {
   display: inline-flex;
   align-items: center;
+  min-height: 36px;
+  padding: 0.15rem 0.2rem;
   min-width: 0;
   max-width: 100%;
   color: var(--text);
@@ -1015,11 +1033,14 @@ input.routine-title:focus {
   text-overflow: ellipsis;
 }
 
-a.drill-link:hover {
+.drill-link:hover,
+.drill-link:focus-visible {
+  color: var(--green);
+  background: var(--green-soft);
   border-bottom-color: var(--green);
 }
 
-a.drill-link:focus-visible {
+.drill-link:focus-visible {
   outline: 2px solid var(--green);
   outline-offset: 2px;
   border-radius: 4px;
@@ -1249,7 +1270,7 @@ a.drill-link:focus-visible {
 }
 
 .stats-detail h3 {
-  margin: 0 0 0.6rem;
+  margin: 0 0 0.65rem;
   font: 600 1rem "Rajdhani", sans-serif;
 }
 
@@ -1486,17 +1507,21 @@ a.drill-link:focus-visible {
 }
 
 .filter-chip {
-  padding: 0.25rem 0.55rem;
+  min-height: 36px;
+  padding: 0.45rem 0.7rem;
   border-radius: 20px;
   border: 1px solid var(--muted);
   background: transparent;
   color: var(--text);
   font: 500 0.78rem "Space Grotesk", sans-serif;
+  display: inline-flex;
+  align-items: center;
   cursor: pointer;
   transition: all 200ms ease;
 }
 
-.filter-chip:hover {
+.filter-chip:hover,
+.filter-chip:focus-visible {
   border-color: var(--green);
   color: var(--green);
   background: var(--green-soft);
@@ -1525,9 +1550,14 @@ a.drill-link:focus-visible {
 
 .activity-chart {
   display: flex;
+  justify-content: space-between;
   align-items: flex-end;
   gap: 0.55rem;
-  height: 150px;
+  min-height: 160px;
+  padding: 0.7rem 0.55rem 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card-glass);
 }
 
 .activity-col {
@@ -1536,31 +1566,32 @@ a.drill-link:focus-visible {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.25rem;
 }
 
 .activity-count {
-  font-size: 0.76rem;
-  color: var(--muted);
+  font-size: 0.72rem;
+  color: var(--accent-soft);
+  font-weight: 700;
   line-height: 1;
 }
 
-.activity-bar-wrap {
-  width: 100%;
-  height: 100px;
-  border-radius: 8px;
-  border: 1px solid var(--line);
-  background: var(--card-glass);
+.activity-bar-area {
+  width: 74%;
+  height: 98px;
   display: flex;
   align-items: flex-end;
-  overflow: hidden;
 }
 
 .activity-bar {
   width: 100%;
   background: linear-gradient(180deg, rgba(76, 175, 80, 0.9), rgba(76, 175, 80, 0.55));
-  border-radius: 7px 7px 0 0;
+  border-radius: 6px 6px 2px 2px;
   transition: height 400ms ease;
+}
+
+.activity-chart.is-empty .activity-bar {
+  opacity: 0.35;
 }
 
 .activity-day {
@@ -1584,7 +1615,7 @@ a.drill-link:focus-visible {
 }
 
 .avg-rating-section h3 {
-  margin: 0 0 0.4rem;
+  margin: 0 0 0.65rem;
   font: 600 1rem "Rajdhani", sans-serif;
 }
 
@@ -1614,7 +1645,7 @@ a.drill-link:focus-visible {
 }
 
 .practice-log h3 {
-  margin: 0 0 0.6rem;
+  margin: 0 0 0.65rem;
   font: 600 1rem "Rajdhani", sans-serif;
 }
 
@@ -1677,7 +1708,7 @@ a.drill-link:focus-visible {
 }
 
 .calendar-heatmap h3 {
-  margin: 0 0 0.6rem;
+  margin: 0 0 0.65rem;
   font: 600 1rem "Rajdhani", sans-serif;
 }
 
@@ -2791,8 +2822,8 @@ a.drill-link:focus-visible {
 }
 
 .home-recent-routines h3 {
-  font: 600 1.05rem "Rajdhani", sans-serif;
-  margin: 0 0 0.6rem;
+  font: 600 1rem "Rajdhani", sans-serif;
+  margin: 0 0 0.65rem;
 }
 
 .home-recent-card {

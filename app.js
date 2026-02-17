@@ -1285,7 +1285,7 @@ function renderHomeProgress() {
 
   api("/api/stats").then((result) => {
     const el = document.getElementById("homeStatStreak");
-    if (el) el.textContent = (result.stats.currentStreak || 0) + "d";
+    if (el) el.textContent = formatDayCount(result.stats.currentStreak ?? 0);
   }).catch(() => {});
 }
 
@@ -2394,7 +2394,7 @@ profileForm.addEventListener("submit", (event) => {
       renderRoutine(currentRoutine);
       renderProfileSummary(profile);
       updateEmptyState();
-      setMessage("Routine generated with smart rules engine. Save it when ready.");
+      setMessage("Routine generated from your handicap, selected weaknesses, and weekly schedule. Save it when ready.");
     } catch (err) {
       setMessage(err.message, true);
     } finally {
@@ -2663,8 +2663,8 @@ async function loadStats() {
 function renderStats(stats) {
   document.getElementById("statRoutines").textContent = stats.totalRoutines;
   document.getElementById("statCompleted").textContent = stats.completedSessions;
-  document.getElementById("statStreak").textContent = stats.currentStreak + "d";
-  document.getElementById("statLongest").textContent = stats.longestStreak + "d";
+  document.getElementById("statStreak").textContent = formatDayCount(stats.currentStreak);
+  document.getElementById("statLongest").textContent = formatDayCount(stats.longestStreak);
 
   const pct = stats.totalSessions > 0 ? Math.round((stats.completedSessions / stats.totalSessions) * 100) : 0;
   document.getElementById("statProgressBar").style.width = `${pct}%`;
@@ -2821,7 +2821,7 @@ function parseCompletionTimestamp(value) {
 }
 
 function buildLast7DayActivity() {
-  const dayLabels = ["S", "M", "T", "W", "T", "F", "S"];
+  const dayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const now = new Date();
   const days = [];
   const counts = {};
@@ -2856,8 +2856,15 @@ function buildLast7DayActivity() {
   return days.map((d) => ({ ...d, count: counts[d.key] || 0 }));
 }
 
+function formatDayCount(value) {
+  if (value == null) return "\u2014";
+  const num = Number(value);
+  if (!Number.isFinite(num)) return "\u2014";
+  return `${num} days`;
+}
+
 function renderLast7DayActivity(statsContent) {
-  const data = buildLast7DayActivity();
+  const data = buildLast7DayActivity().sort((a, b) => a.key.localeCompare(b.key));
   const maxCount = Math.max(1, ...data.map((d) => d.count));
   const total = data.reduce((sum, d) => sum + d.count, 0);
 
@@ -2867,14 +2874,15 @@ function renderLast7DayActivity(statsContent) {
 
   const chart = document.createElement("div");
   chart.className = "activity-chart";
+  if (total === 0) chart.classList.add("is-empty");
 
   data.forEach((day) => {
     const col = document.createElement("div");
     col.className = "activity-col";
-    const barHeight = day.count === 0 ? 8 : Math.max(8, Math.round((day.count / maxCount) * 100));
+    const barHeight = day.count === 0 ? 14 : Math.max(24, Math.round((day.count / maxCount) * 100));
     col.innerHTML = `
       <span class="activity-count">${day.count}</span>
-      <div class="activity-bar-wrap"><div class="activity-bar" style="height:${barHeight}%"></div></div>
+      <div class="activity-bar-area"><div class="activity-bar" style="height:${barHeight}%"></div></div>
       <span class="activity-day">${day.label}</span>
     `;
     chart.appendChild(col);
@@ -2885,7 +2893,7 @@ function renderLast7DayActivity(statsContent) {
   if (total === 0) {
     const empty = document.createElement("p");
     empty.className = "stat-progress-text";
-    empty.textContent = "No completed sessions in the last 7 days yet.";
+    empty.textContent = "No completions yet. Your next session starts the streak.";
     section.appendChild(empty);
   }
 
