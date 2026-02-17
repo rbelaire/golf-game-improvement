@@ -83,6 +83,8 @@ const homePanel = document.getElementById("homePanel");
 const homeOnboarding = document.getElementById("homeOnboarding");
 const homeDashboard = document.getElementById("homeDashboard");
 const homeChecklistSteps = document.getElementById("homeChecklistSteps");
+const homeSetupSection = document.getElementById("homeSetupSection");
+const homeSetupChecklistSteps = document.getElementById("homeSetupChecklistSteps");
 const homeProfileBar = document.getElementById("homeProfileBar");
 const homeTodayCard = document.getElementById("homeTodayCard");
 const homeProgressGrid = document.getElementById("homeProgressGrid");
@@ -848,11 +850,22 @@ function setPlanSubmode(submode) {
 function updateSelectedDrillsBtn() {
   if (!selectedDrillsBtn) return;
   const count = selectedDrillsStore?.getSelectedDrillIds()?.length || 0;
-  selectedDrillsBtn.textContent = `Selected (${count})`;
-  selectedDrillsBtn.disabled = count === 0;
-  selectedDrillsBtn.title = count === 0
-    ? "Select drills first to build a custom routine."
-    : "Open Plan in Custom mode with your selected drills.";
+  const hasSelected = count > 0;
+  selectedDrillsBtn.classList.toggle("hidden", !hasSelected);
+  selectedDrillsBtn.classList.toggle("has-selection", hasSelected);
+  selectedDrillsBtn.disabled = !hasSelected;
+  selectedDrillsBtn.textContent = hasSelected
+    ? `Selected (${count}) • Build routine \u2192`
+    : "Select drills to build a routine";
+  selectedDrillsBtn.title = hasSelected
+    ? "Open Plan in Custom mode with your selected drills."
+    : "Select drills first to build a custom routine.";
+  selectedDrillsBtn.setAttribute(
+    "aria-label",
+    hasSelected
+      ? `Selected ${count} drills. Build routine.`
+      : "No drills selected"
+  );
 }
 
 function setPlanMode(mode) {
@@ -951,11 +964,12 @@ function renderHomeDashboard() {
 
   homeSessionRunner.classList.add("hidden");
   const state = getOnboardingState();
+  const hasRoutine = Boolean(currentRoutine || savedRoutines.length > 0);
 
-  if (state.allDone) {
+  if (hasRoutine) {
     homeOnboarding.classList.add("hidden");
     homeDashboard.classList.remove("hidden");
-    renderDashboardHub(state);
+    renderDashboardHub(state, true);
   } else {
     homeOnboarding.classList.remove("hidden");
     homeDashboard.classList.add("hidden");
@@ -963,7 +977,7 @@ function renderHomeDashboard() {
   }
 }
 
-function renderOnboardingChecklist(state) {
+function renderOnboardingChecklist(state, container = homeChecklistSteps) {
   const steps = [
     { label: "Create account",        hint: "Sign up to save your progress",                done: state.signedUp,         action: () => setPlanMode("generated") },
     { label: "Set up golf profile",   hint: "Tell us your handicap and weaknesses",          done: state.profileDone,      action: () => { setPlanMode("generated"); expandProfileForm(); } },
@@ -975,7 +989,7 @@ function renderOnboardingChecklist(state) {
     }}
   ];
 
-  homeChecklistSteps.innerHTML = "";
+  container.innerHTML = "";
   let currentFound = false;
   steps.forEach((step, i) => {
     const isCurrent = !step.done && !currentFound;
@@ -1000,13 +1014,20 @@ function renderOnboardingChecklist(state) {
       </span>
       ${isCurrent ? '<span class="checklist-arrow">&#8594;</span>' : ""}`;
     el.addEventListener("click", step.action);
-    homeChecklistSteps.appendChild(el);
+    container.appendChild(el);
   });
 }
 
-function renderDashboardHub(state) {
+function renderDashboardHub(state, showSetup = false) {
   renderHomeProfileBar(state.profile);
   renderTodayTrainingCard();
+  if (homeSetupSection) {
+    homeSetupSection.classList.toggle("hidden", !showSetup);
+    if (showSetup) {
+      // Keep setup checklist available, but deprioritize once a routine exists.
+      renderOnboardingChecklist(state, homeSetupChecklistSteps);
+    }
+  }
   renderHomeProgress();
   renderHomeQuickActions();
   renderHomeRecentRoutines();
@@ -1040,7 +1061,7 @@ function renderTodayTrainingCard() {
   const activeRoutine = savedRoutines.find(r => {
     const prog = routineProgress(r);
     return prog.pct < 100 && prog.total > 0;
-  });
+  }) || currentRoutine;
 
   if (!activeRoutine) {
     homeTodayCard.innerHTML = `
@@ -1058,10 +1079,11 @@ function renderTodayTrainingCard() {
 
   const prog = routineProgress(activeRoutine);
   const bullets = next.session.bullets || [];
+  const previewBullets = bullets.slice(0, 5);
 
   // Sum durations for total time display
   let totalMins = 0;
-  const drillsHtml = bullets.map(b => {
+  const drillsHtml = previewBullets.map(b => {
     const durationMatch = b.match(/^(\d+)\s*min/);
     const mins = durationMatch ? parseInt(durationMatch[1], 10) : 0;
     totalMins += mins;
@@ -1581,6 +1603,29 @@ function parseBulletDuration(bullet) {
   return match ? match[1] + " min" : "";
 }
 
+function defaultMetaForType(type) {
+  if (type === "warmup") return "prep flow";
+  if (type === "pressure") return "consequence scoring";
+  if (type === "transfer") return "on-course transfer";
+  if (type === "reflection") return "review notes";
+  return "technique focus";
+}
+
+function summarizeDrillMeta(detailText, type) {
+  const detail = String(detailText || "").trim();
+  if (!detail) return defaultMetaForType(type);
+
+  const lower = detail.toLowerCase();
+  const tags = [];
+  if (/(rep|reps|sets|rounds|ladders|cycles)/.test(lower)) tags.push("target reps");
+  if (/(track|tracked|measure|outcome|dispersion|make %|strokes|fairway|up-and-down|distance control)/.test(lower)) tags.push("tracked outcomes");
+  if (/(consequence|score|scoring|points|penalty|challenge|pressure)/.test(lower)) tags.push("consequence scoring");
+  if (tags.length) return tags.slice(0, 2).join(" • ");
+
+  const firstClause = detail.split(/[.;]/)[0].trim();
+  return firstClause || defaultMetaForType(type);
+}
+
 function renderRoutine(routine) {
   if (!routine) {
     routineCard.classList.add("hidden");
@@ -1708,25 +1753,78 @@ function renderRoutine(routine) {
         chip.textContent = duration || type;
         drillBlock.appendChild(chip);
 
-        const text = document.createElement("span");
-        text.className = "drill-text";
-        const bulletText = bullet.replace(/^\d+\s*min\s*/, "");
-        // Try to find drill name in the bullet and make it clickable
+        const content = document.createElement("div");
+        content.className = "drill-content";
+
+        const bulletText = bullet.replace(/^\d+\s*min\s*[–—-]?\s*/, "").trim();
         const drillMatch = drillLibraryCache ? drillLibraryCache.find((d) => bulletText.includes(d.name)) : null;
+
+        const drillName = drillMatch
+          ? drillMatch.name
+          : bulletText.split(/[–—:-]/)[0].trim();
+        const detailTextRaw = drillName
+          ? bulletText.replace(drillName, "").replace(/^[\s:–—-]+/, "").trim()
+          : bulletText;
+        const metaText = summarizeDrillMeta(detailTextRaw, type);
+        const detailsText = detailTextRaw && detailTextRaw !== metaText ? detailTextRaw : "";
+
+        const topRow = document.createElement("div");
+        topRow.className = "drill-top-row";
+
         if (drillMatch) {
-          const parts = bulletText.split(drillMatch.name);
-          if (parts[0]) text.appendChild(document.createTextNode(parts[0]));
           const link = document.createElement("a");
           link.className = "drill-link";
-          link.textContent = drillMatch.name;
+          link.textContent = drillName || "Drill";
           link.href = "#";
-          link.addEventListener("click", (e) => { e.preventDefault(); openDrillModal(drillMatch); });
-          text.appendChild(link);
-          if (parts[1]) text.appendChild(document.createTextNode(parts[1]));
+          link.addEventListener("click", (e) => {
+            e.preventDefault();
+            openDrillModal(drillMatch);
+          });
+          topRow.appendChild(link);
         } else {
-          text.textContent = bulletText;
+          const name = document.createElement("span");
+          name.className = "drill-link";
+          name.textContent = drillName || bulletText;
+          topRow.appendChild(name);
         }
-        drillBlock.appendChild(text);
+
+        if (detailsText) {
+          const detailId = `drill-details-${wi}-${si}-${body.children.length}`;
+          const detailsToggle = document.createElement("button");
+          detailsToggle.type = "button";
+          detailsToggle.className = "drill-details-toggle";
+          detailsToggle.setAttribute("aria-expanded", "false");
+          detailsToggle.setAttribute("aria-controls", detailId);
+          detailsToggle.innerHTML = '<span>Details</span><span class="chev">&#9662;</span>';
+
+          const details = document.createElement("div");
+          details.className = "drill-details";
+          details.id = detailId;
+          details.textContent = detailsText;
+
+          detailsToggle.addEventListener("click", () => {
+            const expanded = detailsToggle.getAttribute("aria-expanded") === "true";
+            detailsToggle.setAttribute("aria-expanded", expanded ? "false" : "true");
+            details.classList.toggle("open", !expanded);
+          });
+
+          topRow.appendChild(detailsToggle);
+          content.appendChild(topRow);
+
+          const meta = document.createElement("div");
+          meta.className = "drill-meta";
+          meta.textContent = metaText;
+          content.appendChild(meta);
+          content.appendChild(details);
+        } else {
+          content.appendChild(topRow);
+          const meta = document.createElement("div");
+          meta.className = "drill-meta";
+          meta.textContent = metaText;
+          content.appendChild(meta);
+        }
+
+        drillBlock.appendChild(content);
 
         body.appendChild(drillBlock);
       });
@@ -2149,7 +2247,11 @@ submitPasswordChangeBtn.addEventListener("click", async () => {
 });
 
 showHomeBtn.addEventListener("click", () => setPlanMode("home"));
-showGeneratedRoutineBtn.addEventListener("click", () => setPlanMode("generated"));
+showGeneratedRoutineBtn.addEventListener("click", () => {
+  setPlanMode("generated");
+  // Routine tab defaults to Generated only when a generated routine currently exists.
+  setPlanSubmode(currentRoutine ? "generated" : "custom");
+});
 showCustomRoutineBtn.addEventListener("click", () => setPlanMode("custom"));
 showDrillLibraryBtn.addEventListener("click", () => setPlanMode("drills"));
 showStatsBtn.addEventListener("click", () => setPlanMode("stats"));
