@@ -25,6 +25,41 @@ const PORT = process.env.PORT || 3000;
 const SESSION_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 const authLimiter = createRateLimiter(10, 60000);
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "").split(",").map((s) => s.trim()).filter(Boolean);
+const SITE_URL = process.env.PUBLIC_SITE_URL || "https://thegolfbuild.com";
+const PUBLIC_SEO_ROUTES = {
+  "/": {
+    title: "Golf Practice Plan Generator | thegolfbuild",
+    description: "Generate personalized golf practice plans from your handicap, weaknesses, and time. Run sessions, track progress, and improve faster.",
+    canonical: "https://thegolfbuild.com/",
+    marketingHeading: "Build Better Golf Practice, Faster",
+    marketingSubheading: "Generate personalized plans and track consistent improvement.",
+    marketingBody: "thegolfbuild helps golfers turn limited practice time into structured sessions built around skill level, weaknesses, and schedule."
+  },
+  "/drills": {
+    title: "Golf Drill Library (330+ Drills) | thegolfbuild",
+    description: "Browse golf drills by skill and focus area. Build routines from warm-up, technical, pressure, and transfer blocks.",
+    canonical: "https://thegolfbuild.com/drills",
+    marketingHeading: "Explore the Drill Library",
+    marketingSubheading: "Find drills by focus area, difficulty, and training intent.",
+    marketingBody: "Review warm-up, technical, pressure, and transfer drills to assemble focused sessions without guesswork."
+  },
+  "/routine": {
+    title: "Golf Practice Routines | thegolfbuild",
+    description: "Create generated or custom golf practice routines. Sessions are structured for measurable improvement.",
+    canonical: "https://thegolfbuild.com/routine",
+    marketingHeading: "Create Structured Practice Routines",
+    marketingSubheading: "Generate plans or build custom sessions with clear progression.",
+    marketingBody: "Use routine templates and custom session building to create measurable practice blocks that map to your goals."
+  },
+  "/stats": {
+    title: "Practice Progress & Streaks | thegolfbuild",
+    description: "Track sessions, streaks, and skill coverage over time to stay consistent and improve.",
+    canonical: "https://thegolfbuild.com/stats",
+    marketingHeading: "Track Progress That Matters",
+    marketingSubheading: "Monitor completion, streaks, and long-term consistency.",
+    marketingBody: "See practice volume, progress percentage, and activity trends to keep momentum and improve over time."
+  }
+};
 
 function sendJson(res, status, payload) {
   res.writeHead(status, { "Content-Type": "application/json" });
@@ -105,7 +140,7 @@ async function parseAuthUser(req) {
 
 function isSafeStaticPath(filePath) {
   const resolved = path.resolve(filePath);
-  return resolved.startsWith(path.resolve(__dirname));
+  return resolved.startsWith(path.resolve(__dirname)) || resolved.startsWith(path.resolve(__dirname, "public"));
 }
 
 function contentType(fileName) {
@@ -114,10 +149,134 @@ function contentType(fileName) {
   if (ext === ".css") return "text/css; charset=utf-8";
   if (ext === ".js") return "application/javascript; charset=utf-8";
   if (ext === ".json") return "application/json; charset=utf-8";
+  if (ext === ".xml") return "application/xml; charset=utf-8";
+  if (ext === ".txt") return "text/plain; charset=utf-8";
   if (ext === ".webmanifest") return "application/manifest+json; charset=utf-8";
   if (ext === ".svg") return "image/svg+xml";
   if (ext === ".png") return "image/png";
   return "text/plain; charset=utf-8";
+}
+
+function normalizeRoutePath(pathname) {
+  if (!pathname || pathname === "/") return "/";
+  return pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
+}
+
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function withAbsoluteUrl(pathOrUrl) {
+  if (!pathOrUrl) return SITE_URL;
+  if (/^https?:\/\//i.test(pathOrUrl)) return pathOrUrl;
+  return new URL(pathOrUrl, SITE_URL).toString();
+}
+
+function upsertMetaByName(html, name, content) {
+  const tag = `<meta name="${name}" content="${escapeHtml(content)}">`;
+  const regex = new RegExp(`<meta\\s+name=["']${name}["'][^>]*>`, "i");
+  if (regex.test(html)) return html.replace(regex, tag);
+  return html.replace("</head>", `  ${tag}\n</head>`);
+}
+
+function upsertMetaByProperty(html, property, content) {
+  const tag = `<meta property="${property}" content="${escapeHtml(content)}">`;
+  const regex = new RegExp(`<meta\\s+property=["']${property}["'][^>]*>`, "i");
+  if (regex.test(html)) return html.replace(regex, tag);
+  return html.replace("</head>", `  ${tag}\n</head>`);
+}
+
+function upsertCanonical(html, href) {
+  const tag = `<link rel="canonical" href="${escapeHtml(href)}">`;
+  const regex = /<link\s+rel=["']canonical["'][^>]*>/i;
+  if (regex.test(html)) return html.replace(regex, tag);
+  return html.replace("</head>", `  ${tag}\n</head>`);
+}
+
+function upsertJsonLd(html, id, payload) {
+  const tag = `<script id="${id}" type="application/ld+json">${JSON.stringify(payload)}</script>`;
+  const regex = new RegExp(`<script\\s+id=["']${id}["'][\\s\\S]*?<\\/script>`, "i");
+  if (regex.test(html)) return html.replace(regex, tag);
+  return html.replace("</head>", `  ${tag}\n</head>`);
+}
+
+function buildSeoPayload(pathname) {
+  const normalized = normalizeRoutePath(pathname);
+  const routeSeo = PUBLIC_SEO_ROUTES[normalized];
+  const isPublic = Boolean(routeSeo);
+  const title = routeSeo?.title || "thegolfbuild App";
+  const description = routeSeo?.description || "Golf training app. Sign in to access your routines and account-specific data.";
+  const canonical = routeSeo?.canonical || withAbsoluteUrl(normalized);
+  const ogImage = withAbsoluteUrl("/og/thegolfbuild-og.png");
+  const robots = isPublic ? "index,follow,max-image-preview:large" : "noindex,nofollow";
+
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebSite",
+        name: "thegolfbuild",
+        url: SITE_URL
+      },
+      {
+        "@type": "WebApplication",
+        name: "thegolfbuild",
+        applicationCategory: "SportsApplication",
+        operatingSystem: "Web",
+        description,
+        url: canonical
+      },
+      {
+        "@type": "Organization",
+        name: "thegolfbuild",
+        url: SITE_URL,
+        logo: withAbsoluteUrl("/favicon.svg")
+      }
+    ]
+  };
+
+  const intro = routeSeo
+    ? `
+    <section id="seo-public-intro" style="max-width:1200px;margin:0 auto;padding:16px 16px 8px;border-bottom:1px solid rgba(127,127,127,.22);">
+      <h2 style="margin:0 0 6px;font-family:Rajdhani,sans-serif;font-size:1.65rem;line-height:1.2;">${escapeHtml(routeSeo.marketingHeading)}</h2>
+      <p style="margin:0 0 6px;color:#8f969f;font-size:1rem;">${escapeHtml(routeSeo.marketingSubheading)}</p>
+      <p style="margin:0;color:#9aa2ab;font-size:.95rem;">${escapeHtml(routeSeo.marketingBody)}</p>
+    </section>`
+    : "";
+
+  return { title, description, canonical, ogImage, robots, jsonLd, intro };
+}
+
+function renderPublicShell(pathname) {
+  const indexPath = path.join(__dirname, "index.html");
+  let html = fs.readFileSync(indexPath, "utf8");
+  const seo = buildSeoPayload(pathname);
+
+  html = html.replace(/<title>[\s\S]*?<\/title>/i, `<title>${escapeHtml(seo.title)}</title>`);
+  html = upsertMetaByName(html, "description", seo.description);
+  html = upsertCanonical(html, seo.canonical);
+  html = upsertMetaByName(html, "robots", seo.robots);
+  html = upsertMetaByProperty(html, "og:title", seo.title);
+  html = upsertMetaByProperty(html, "og:description", seo.description);
+  html = upsertMetaByProperty(html, "og:url", seo.canonical);
+  html = upsertMetaByProperty(html, "og:type", "website");
+  html = upsertMetaByProperty(html, "og:image", seo.ogImage);
+  html = upsertMetaByName(html, "twitter:card", "summary_large_image");
+  html = upsertMetaByName(html, "twitter:title", seo.title);
+  html = upsertMetaByName(html, "twitter:description", seo.description);
+  html = upsertMetaByName(html, "twitter:image", seo.ogImage);
+  html = upsertJsonLd(html, "seo-jsonld", seo.jsonLd);
+
+  if (seo.intro) {
+    html = html.replace("<body>", `<body>\n${seo.intro}`);
+  }
+
+  return html;
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -620,9 +779,14 @@ async function handleApi(req, res, url) {
 
 function handleStatic(req, res, url) {
   const routePath = url.pathname === "/" ? "/index.html" : url.pathname;
-  const filePath = path.join(__dirname, decodeURIComponent(routePath));
+  const decodedPath = decodeURIComponent(routePath);
+  const candidates = [
+    path.join(__dirname, decodedPath),
+    path.join(__dirname, "public", decodedPath)
+  ];
+  const filePath = candidates.find((candidate) => isSafeStaticPath(candidate) && fs.existsSync(candidate) && !fs.statSync(candidate).isDirectory());
 
-  if (!isSafeStaticPath(filePath) || !fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
+  if (!filePath) {
     res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
     res.end("Not found");
     return;
@@ -676,6 +840,14 @@ async function requestHandler(req, res, options = {}) {
 
   if (options.apiOnly) {
     sendJson(res, 404, { error: "Not found" });
+    return;
+  }
+
+  const hasFileExtension = path.extname(url.pathname) !== "";
+  if (req.method === "GET" && !hasFileExtension) {
+    const html = renderPublicShell(url.pathname);
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+    res.end(html);
     return;
   }
 
