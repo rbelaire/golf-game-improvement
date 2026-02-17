@@ -167,13 +167,3 @@ Routines are generated entirely by the built-in rules engine (no AI provider or 
 ## Super user bootstrap
 
 To ensure a super user exists on startup, set `SUPER_USER_EMAIL` and `SUPER_USER_PASSWORD`. The account is created (or updated) once during `db.init()` with `role: "super"` and `plan: "pro"`.
-
-## SEO verification checklist
-
-- `curl -I https://thegolfbuild.com/robots.txt` returns `200` and `text/plain`.
-- `curl -I https://thegolfbuild.com/sitemap.xml` returns `200` and `application/xml` or `text/xml`.
-- `view-source:https://thegolfbuild.com/` includes route title, description, canonical, OpenGraph/Twitter tags, and JSON-LD.
-- `view-source:https://thegolfbuild.com/drills` includes drills-specific title/description/canonical.
-- `view-source:https://thegolfbuild.com/routine` includes routine-specific title/description/canonical.
-- `view-source:https://thegolfbuild.com/stats` includes stats-specific title/description/canonical.
-- Run Lighthouse (mobile + desktop) and verify basic SEO/Best Practices/Performance checks pass with no critical regressions.

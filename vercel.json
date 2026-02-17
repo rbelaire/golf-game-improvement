@@ -1,34 +1,6 @@
 {
   "rewrites": [
     {
-      "source": "/",
-      "destination": "/api/index.js"
-    },
-    {
-      "source": "/drills",
-      "destination": "/api/index.js"
-    },
-    {
-      "source": "/drills/(.*)",
-      "destination": "/api/index.js"
-    },
-    {
-      "source": "/routine",
-      "destination": "/api/index.js"
-    },
-    {
-      "source": "/routine/(.*)",
-      "destination": "/api/index.js"
-    },
-    {
-      "source": "/stats",
-      "destination": "/api/index.js"
-    },
-    {
-      "source": "/stats/(.*)",
-      "destination": "/api/index.js"
-    },
-    {
       "source": "/api/(.*)",
       "destination": "/api/index.js"
     }

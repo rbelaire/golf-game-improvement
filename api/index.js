@@ -9,7 +9,7 @@ module.exports = async (req, res) => {
       initPromise = db.init();
     }
     await initPromise;
-    await requestHandler(req, res);
+    await requestHandler(req, res, { apiOnly: true });
   } catch (err) {
     console.error(err);
     res.statusCode = 500;
