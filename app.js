@@ -2533,6 +2533,12 @@ async function loadStats() {
   const statsContent = document.getElementById("statsContent");
   showSkeleton(statsContent, "stats");
   try {
+    if (!drillLibraryCache) {
+      try {
+        const drillsResult = await api("/api/drills");
+        drillLibraryCache = drillsResult.drills || null;
+      } catch (_) {}
+    }
     const result = await api("/api/stats");
     // Restore stats HTML structure before rendering
     statsContent.innerHTML = `
@@ -2564,24 +2570,229 @@ function renderStats(stats) {
 
   const weaknessEl = document.getElementById("statWeakness");
   weaknessEl.innerHTML = "";
-  const coverage = stats.weaknessCoverage || {};
-  const allWeaknesses = ["Driving accuracy", "Approach consistency", "Short game touch", "Putting confidence", "Course management"];
-  const maxCount = Math.max(1, ...Object.values(coverage));
+  const coverageRows = buildWeaknessCoverageRows();
+  if (coverageRows.total === 0) {
+    weaknessEl.innerHTML = '<p class="stat-progress-text">No completion data yet.</p>';
+    return;
+  }
 
-  for (const w of allWeaknesses) {
-    const count = coverage[w] || 0;
-    const barPct = Math.round((count / maxCount) * 100);
+  for (const rowData of coverageRows.rows) {
     const row = document.createElement("div");
     row.className = "weakness-row";
-    row.innerHTML = `<span>${w}</span>` +
-      `<div class="bar-bg"><div class="bar-fill" style="width:${barPct}%"></div></div>` +
-      `<span class="bar-count">${count}</span>`;
+    row.innerHTML = `<span>${rowData.label}</span>` +
+      `<div class="bar-bg"><div class="bar-fill" style="width:${rowData.percent}%"></div></div>` +
+      `<span class="bar-count coverage-percent">${rowData.percent}%</span>`;
     weaknessEl.appendChild(row);
   }
 }
 
+const COVERAGE_CATEGORIES = [
+  { id: "driving", label: "Driving" },
+  { id: "approach", label: "Approach" },
+  { id: "short_game", label: "Short Game" },
+  { id: "putting", label: "Putting" },
+  { id: "course_management", label: "Course Management" }
+];
+
+function mapWeaknessToCoverageId(raw) {
+  const weakness = String(raw || "").toLowerCase();
+  if (!weakness) return null;
+  if (weakness.includes("putt")) return "putting";
+  if (weakness.includes("short game") || weakness.includes("chip") || weakness.includes("pitch") || weakness.includes("bunker")) return "short_game";
+  if (weakness.includes("driv") || weakness.includes("fairway wood") || weakness.includes("hybrid")) return "driving";
+  if (weakness.includes("approach") || weakness.includes("ball striking") || weakness.includes("distance control")) return "approach";
+  if (weakness.includes("course management") || weakness.includes("mental game") || weakness.includes("scoring under pressure")) return "course_management";
+  return null;
+}
+
+function getCompletedSessionsForCoverage(limit = 14) {
+  const entries = [];
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 13);
+
+  for (const routine of savedRoutines) {
+    const completions = routine.completions || {};
+    for (const [key, completion] of Object.entries(completions)) {
+      if (!completion) continue;
+      const match = key.match(/^(\d+)-(\d+)$/);
+      if (!match) continue;
+      const wi = Number(match[1]);
+      const si = Number(match[2]);
+      const session = routine.weeks?.[wi]?.sessions?.[si];
+      if (!session) continue;
+      const completedAt = parseCompletionTimestamp(completion) || parseCompletionTimestamp(routine.reflections?.[key]?.date);
+      entries.push({ routine, session, completedAt });
+    }
+  }
+
+  const withDates = entries.filter((e) => e.completedAt);
+  if (withDates.length > 0) {
+    return withDates.filter((e) => e.completedAt >= start);
+  }
+  return entries.slice(-limit);
+}
+
+function getSessionCoverageCategories(entry, drillById) {
+  const categories = new Set();
+  const session = entry.session || {};
+  const routine = entry.routine || {};
+
+  const directWeaknesses = [];
+  if (typeof session.weakness === "string") directWeaknesses.push(session.weakness);
+  if (typeof session.focus === "string") directWeaknesses.push(session.focus);
+  if (typeof session.category === "string") directWeaknesses.push(session.category);
+  if (typeof routine.profileSnapshot?.weakness === "string") directWeaknesses.push(routine.profileSnapshot.weakness);
+  if (Array.isArray(routine.profileSnapshot?.weaknesses)) directWeaknesses.push(...routine.profileSnapshot.weaknesses);
+
+  for (const weakness of directWeaknesses) {
+    const categoryId = mapWeaknessToCoverageId(weakness);
+    if (categoryId) categories.add(categoryId);
+  }
+
+  if (Array.isArray(session.drillIds) && session.drillIds.length > 0) {
+    for (const drillId of session.drillIds) {
+      const drill = drillById.get(drillId);
+      for (const weakness of drill?.weaknesses || []) {
+        const categoryId = mapWeaknessToCoverageId(weakness);
+        if (categoryId) categories.add(categoryId);
+      }
+    }
+  } else if (Array.isArray(session.bullets) && drillLibraryCache) {
+    for (const bullet of session.bullets) {
+      const text = String(bullet || "");
+      const drill = drillLibraryCache.find((d) => text.includes(d.name));
+      for (const weakness of drill?.weaknesses || []) {
+        const categoryId = mapWeaknessToCoverageId(weakness);
+        if (categoryId) categories.add(categoryId);
+      }
+    }
+  }
+
+  return categories;
+}
+
+function buildWeaknessCoverageRows() {
+  const drillById = new Map((drillLibraryCache || []).map((d) => [d.id, d]));
+  const counts = Object.fromEntries(COVERAGE_CATEGORIES.map((c) => [c.id, 0]));
+  const sessions = getCompletedSessionsForCoverage(14);
+
+  for (const entry of sessions) {
+    const categories = getSessionCoverageCategories(entry, drillById);
+    for (const id of categories) {
+      counts[id] += 1;
+    }
+  }
+
+  const total = Object.values(counts).reduce((sum, n) => sum + n, 0);
+  const rows = COVERAGE_CATEGORIES.map((cat) => {
+    const value = counts[cat.id] || 0;
+    const percent = total > 0 ? Math.round((value / total) * 100) : 0;
+    return { id: cat.id, label: cat.label, percent };
+  });
+
+  return { rows, total };
+}
+
+function getLocalDateKey(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function parseCompletionTimestamp(value) {
+  if (!value) return null;
+
+  if (typeof value === "string" || typeof value === "number") {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  if (typeof value === "object") {
+    const ts = value.completedAt || value.completed_at || value.date || value.timestamp;
+    if (!ts) return null;
+    const parsed = new Date(ts);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  return null;
+}
+
+function buildLast7DayActivity() {
+  const dayLabels = ["S", "M", "T", "W", "T", "F", "S"];
+  const now = new Date();
+  const days = [];
+  const counts = {};
+
+  for (let i = 6; i >= 0; i -= 1) {
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+    const key = getLocalDateKey(d);
+    days.push({ key, label: dayLabels[d.getDay()] });
+    counts[key] = 0;
+  }
+
+  for (const routine of savedRoutines) {
+    const completions = routine.completions || {};
+    for (const [sessionKey, completion] of Object.entries(completions)) {
+      // Match existing completion semantics: truthy entry means completed.
+      if (!completion) continue;
+
+      let completedAt = parseCompletionTimestamp(completion);
+      if (!completedAt) {
+        const refDate = routine.reflections?.[sessionKey]?.date;
+        completedAt = refDate ? parseCompletionTimestamp(refDate) : null;
+      }
+      if (!completedAt) continue;
+
+      const localKey = getLocalDateKey(completedAt);
+      if (Object.prototype.hasOwnProperty.call(counts, localKey)) {
+        counts[localKey] += 1;
+      }
+    }
+  }
+
+  return days.map((d) => ({ ...d, count: counts[d.key] || 0 }));
+}
+
+function renderLast7DayActivity(statsContent) {
+  const data = buildLast7DayActivity();
+  const maxCount = Math.max(1, ...data.map((d) => d.count));
+  const total = data.reduce((sum, d) => sum + d.count, 0);
+
+  const section = document.createElement("div");
+  section.className = "stats-detail activity-chart-section";
+  section.innerHTML = "<h3>Activity (Last 7 days)</h3>";
+
+  const chart = document.createElement("div");
+  chart.className = "activity-chart";
+
+  data.forEach((day) => {
+    const col = document.createElement("div");
+    col.className = "activity-col";
+    const barHeight = day.count === 0 ? 8 : Math.max(8, Math.round((day.count / maxCount) * 100));
+    col.innerHTML = `
+      <span class="activity-count">${day.count}</span>
+      <div class="activity-bar-wrap"><div class="activity-bar" style="height:${barHeight}%"></div></div>
+      <span class="activity-day">${day.label}</span>
+    `;
+    chart.appendChild(col);
+  });
+
+  section.appendChild(chart);
+
+  if (total === 0) {
+    const empty = document.createElement("p");
+    empty.className = "stat-progress-text";
+    empty.textContent = "No completed sessions in the last 7 days yet.";
+    section.appendChild(empty);
+  }
+
+  statsContent.appendChild(section);
+}
+
 function renderEnhancedStats(stats) {
   const statsContent = document.getElementById("statsContent");
+  renderLast7DayActivity(statsContent);
 
   // Streak Context
   const streak = stats.currentStreak || 0;
