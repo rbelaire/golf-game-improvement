@@ -822,11 +822,7 @@ function handleStatic(req, res, url) {
     return;
   }
 
-  const headers = { "Content-Type": contentType(filePath) };
-  if (path.basename(filePath) === "sw.js") {
-    headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
-  }
-  res.writeHead(200, headers);
+  res.writeHead(200, { "Content-Type": contentType(filePath) });
   fs.createReadStream(filePath).pipe(res);
 }
 
