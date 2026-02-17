@@ -1083,16 +1083,46 @@ function renderTodayTrainingCard() {
 
   // Sum durations for total time display
   let totalMins = 0;
-  const drillsHtml = previewBullets.map(b => {
+  const previewRows = previewBullets.map((b, idx) => {
     const durationMatch = b.match(/^(\d+)\s*min/);
     const mins = durationMatch ? parseInt(durationMatch[1], 10) : 0;
     totalMins += mins;
-    const drillText = b.replace(/^\d+\s*min\s*[–-]?\s*/, "");
-    return `<div class="today-drill-row">
-      <span class="today-drill-dur">${mins > 0 ? mins + "m" : ""}</span>
-      <span class="today-drill-name">${drillText}</span>
-    </div>`;
-  }).join("");
+    const duration = parseBulletDuration(b);
+    const type = parseBulletType(b);
+    const bulletText = b.replace(/^\d+\s*min\s*[–-]?\s*/, "").trim();
+    const drillMatch = drillLibraryCache ? drillLibraryCache.find((d) => bulletText.includes(d.name)) : null;
+    const drillName = drillMatch ? drillMatch.name : bulletText.split(/[–—:-]/)[0].trim();
+    const detailTextRaw = drillName ? bulletText.replace(drillName, "").replace(/^[\s:–—-]+/, "").trim() : bulletText;
+    const metaTags = buildDrillMetaTags(`${detailTextRaw}. ${drillMatch?.description || ""}`, type);
+
+    return {
+      idx,
+      type,
+      durationLabel: duration ? duration.toUpperCase() : (mins > 0 ? `${mins} MIN` : type.toUpperCase()),
+      name: drillName || bulletText || "Drill",
+      meta: metaTags.join(" • "),
+      drill: drillMatch || {
+        id: null,
+        name: drillName || bulletText || "Drill",
+        description: [detailTextRaw, bulletText].filter(Boolean).join(" ").trim() || "No extra details available.",
+        type,
+        levels: [],
+        weaknesses: []
+      }
+    };
+  });
+
+  const drillsHtml = previewRows.map((row) => `
+    <div class="today-drill-row routine-drill-row">
+      <div class="today-drill-summary">
+        <span class="drill-duration-pill ${row.type}">${row.durationLabel}</span>
+        <div class="today-drill-main">
+          <button class="drill-name-btn today-drill-name-btn" type="button" data-drill-idx="${row.idx}">${row.name}</button>
+          <div class="drill-meta-tags today-drill-meta-tags">${row.meta}</div>
+        </div>
+      </div>
+    </div>
+  `).join("");
 
   const totalLabel = totalMins > 0 ? `${totalMins} min` : "";
   const weekNum = next.weekIndex + 1;
@@ -1122,6 +1152,14 @@ function renderTodayTrainingCard() {
     </div>`;
   homeTodayCard.querySelector(".today-start-btn").addEventListener("click", () => {
     enterSessionRunner(activeRoutine, next);
+  });
+  homeTodayCard.querySelectorAll(".today-drill-name-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const idx = Number(btn.getAttribute("data-drill-idx"));
+      const row = previewRows[idx];
+      if (!row || !row.drill) return;
+      openDrillModal(row.drill);
+    });
   });
 }
 
@@ -1626,6 +1664,110 @@ function summarizeDrillMeta(detailText, type) {
   return firstClause || defaultMetaForType(type);
 }
 
+function buildDrillMetaTags(detailText, type) {
+  const detail = String(detailText || "").trim().toLowerCase();
+  const tags = [];
+
+  const pushTag = (value) => {
+    if (!value) return;
+    if (tags.some((tag) => tag.toLowerCase() === value.toLowerCase())) return;
+    tags.push(value);
+  };
+
+  const phraseMap = [
+    {
+      match: /(target-based reps and tracked outcomes|target reps?.*tracked outcomes|tracked outcomes?.*target reps?)/,
+      add: ["Target reps", "Tracked outcomes"]
+    },
+    {
+      match: /under consequence scoring/,
+      add: ["Consequence scoring"]
+    },
+    {
+      match: /simulate real-hole decisions/,
+      add: ["On-course simulation"]
+    },
+    {
+      match: /random lie/,
+      add: ["Random lies"]
+    }
+  ];
+  phraseMap.forEach((entry) => {
+    if (!entry.match.test(detail)) return;
+    entry.add.forEach(pushTag);
+  });
+
+  if (type === "warmup") pushTag("Warm-up flow");
+  if (type === "technical") pushTag("Technique");
+  if (type === "pressure") pushTag("Pressure");
+  if (type === "transfer") pushTag("On-course transfer");
+  if (type === "reflection") pushTag("Session review");
+
+  if (/(rep|reps|set|sets|round|rounds|ladder|cycle|target-based)/.test(detail)) pushTag("Target reps");
+  if (/(track|tracked|measure|log|outcome|dispersion|percentage|count|score|points|strokes)/.test(detail)) pushTag("Tracked outcomes");
+  if (/(consequence|penalty|restart|fail|pressure|challenge|one ball|pass)/.test(detail)) pushTag("Consequence scoring");
+  if (/(routine|pre-shot|commit|visualize|reset)/.test(detail)) pushTag("Routine discipline");
+  if (/(simulate|real-hole|on-course simulation)/.test(detail)) pushTag("On-course simulation");
+  if (/(random lie|random lies|different lies)/.test(detail)) pushTag("Random lies");
+  if (/(course|decision|strategy|vary|on-course)/.test(detail)) pushTag("Decision training");
+
+  if (tags.length < 2) {
+    if (type === "pressure") pushTag("Consequence scoring");
+    else if (type === "transfer") pushTag("Scoring simulation");
+    else pushTag("Target reps");
+  }
+  if (tags.length < 3) pushTag("Tracked outcomes");
+
+  return tags.slice(0, 4);
+}
+
+function buildDrillDetailsSections(detailText, drillDescription, type, duration, drillName) {
+  const source = [detailText, drillDescription].filter(Boolean).join(". ");
+  const sentences = source
+    .split(/[.;]\s+|\n+/)
+    .map((part) => part.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+  const used = new Set();
+
+  const take = (regex, limit = 2) => {
+    const picks = [];
+    for (let i = 0; i < sentences.length; i += 1) {
+      if (used.has(i)) continue;
+      const sentence = sentences[i];
+      if (!regex.test(sentence.toLowerCase())) continue;
+      picks.push(sentence);
+      used.add(i);
+      if (picks.length >= limit) break;
+    }
+    return picks;
+  };
+
+  const setup = take(/\b(set|setup|place|pick|choose|align|station|target|drop|mark|use)\b/, 2);
+  const execution = take(/\b(hit|swing|roll|play|run|alternate|repeat|execute|complete|practice)\b/, 2);
+  const scoring = take(/\b(score|count|track|measure|pass|target|points?|strokes?|percent|average|dispersion)\b/, 2);
+  const progression = take(/\b(progression|progress|increase|reduce|narrow|tighten|advance|add|next|harder)\b/, 2);
+
+  if (!setup.length) {
+    setup.push(`Set a clear target and station for ${drillName || "this drill"} before starting.`);
+  }
+  if (!execution.length) {
+    execution.push(`Complete the block${duration ? ` for ${duration.toLowerCase()}` : ""} with full pre-shot routine discipline.`);
+  }
+  if (!scoring.length) {
+    scoring.push(type === "pressure" ? "Track pass/fail outcomes with consequence scoring each rep." : "Track outcomes by reps completed and quality of strike.");
+  }
+  if (!progression.length) {
+    progression.push("Increase difficulty only after two clean rounds at the current target.");
+  }
+
+  return {
+    setup: setup.slice(0, 3),
+    execution: execution.slice(0, 3),
+    scoring: scoring.slice(0, 3),
+    progression: progression.slice(0, 3)
+  };
+}
+
 function renderRoutine(routine) {
   if (!routine) {
     routineCard.classList.add("hidden");
@@ -1741,91 +1883,126 @@ function renderRoutine(routine) {
       const body = document.createElement("div");
       body.className = "session-card-body";
 
-      session.bullets.forEach((bullet) => {
+      let expandedDrillBlock = null;
+      session.bullets.forEach((bullet, bi) => {
         const drillBlock = document.createElement("div");
-        drillBlock.className = "drill-block";
+        drillBlock.className = "drill-block routine-drill-row";
 
         const type = parseBulletType(bullet);
         const duration = parseBulletDuration(bullet);
-
-        const chip = document.createElement("span");
-        chip.className = `drill-chip ${type}`;
-        chip.textContent = duration || type;
-        drillBlock.appendChild(chip);
-
-        const content = document.createElement("div");
-        content.className = "drill-content";
+        const durationPill = document.createElement("span");
+        durationPill.className = `drill-duration-pill ${type}`;
+        durationPill.textContent = duration ? duration.toUpperCase() : type.toUpperCase();
 
         const bulletText = bullet.replace(/^\d+\s*min\s*[–—-]?\s*/, "").trim();
         const drillMatch = drillLibraryCache ? drillLibraryCache.find((d) => bulletText.includes(d.name)) : null;
+        const drillName = drillMatch ? drillMatch.name : bulletText.split(/[–—:-]/)[0].trim();
+        const detailTextRaw = drillName ? bulletText.replace(drillName, "").replace(/^[\s:–—-]+/, "").trim() : bulletText;
+        const drillDescription = drillMatch?.description || "";
+        const detailSections = buildDrillDetailsSections(detailTextRaw, drillDescription, type, duration, drillName);
+        const metaTags = buildDrillMetaTags(`${detailTextRaw}. ${drillDescription}`, type);
+        const fullDetailsText = [detailTextRaw, drillDescription]
+          .map((text) => String(text || "").trim())
+          .filter((text, idx, arr) => text && arr.findIndex((candidate) => candidate.toLowerCase() === text.toLowerCase()) === idx)
+          .join(" ");
 
-        const drillName = drillMatch
-          ? drillMatch.name
-          : bulletText.split(/[–—:-]/)[0].trim();
-        const detailTextRaw = drillName
-          ? bulletText.replace(drillName, "").replace(/^[\s:–—-]+/, "").trim()
-          : bulletText;
-        const metaText = summarizeDrillMeta(detailTextRaw, type);
-        const detailsText = detailTextRaw && detailTextRaw !== metaText ? detailTextRaw : "";
+        const summary = document.createElement("div");
+        summary.className = "drill-summary-row";
+        summary.appendChild(durationPill);
 
-        const topRow = document.createElement("div");
-        topRow.className = "drill-top-row";
+        const main = document.createElement("div");
+        main.className = "drill-main";
 
-        if (drillMatch) {
-          const link = document.createElement("a");
-          link.className = "drill-link";
-          link.textContent = drillName || "Drill";
-          link.href = "#";
-          link.addEventListener("click", (e) => {
+        const nameBtn = document.createElement("button");
+        nameBtn.type = "button";
+        nameBtn.className = "drill-name-btn";
+        nameBtn.textContent = drillName || bulletText || "Drill";
+        main.appendChild(nameBtn);
+
+        const meta = document.createElement("div");
+        meta.className = "drill-meta-tags";
+        meta.textContent = metaTags.join(" • ");
+        main.appendChild(meta);
+        summary.appendChild(main);
+
+        const detailId = `drill-details-${wi}-${si}-${bi}`;
+        const detailsToggle = document.createElement("button");
+        detailsToggle.type = "button";
+        detailsToggle.className = "drill-details-toggle";
+        detailsToggle.setAttribute("aria-expanded", "false");
+        detailsToggle.setAttribute("aria-controls", detailId);
+        detailsToggle.innerHTML = '<span class="label">Details</span><span class="chev" aria-hidden="true">&#9662;</span>';
+        summary.appendChild(detailsToggle);
+
+        const details = document.createElement("div");
+        details.className = "drill-details";
+        details.id = detailId;
+
+        const sections = [
+          { title: "Setup", items: detailSections.setup },
+          { title: "Execution", items: detailSections.execution },
+          { title: "Scoring", items: detailSections.scoring },
+          { title: "Progression", items: detailSections.progression }
+        ];
+        sections.forEach((section) => {
+          const sectionEl = document.createElement("section");
+          sectionEl.className = "drill-details-section";
+
+          const headingEl = document.createElement("h5");
+          headingEl.textContent = section.title;
+          sectionEl.appendChild(headingEl);
+
+          const listEl = document.createElement("ul");
+          section.items.forEach((item) => {
+            const li = document.createElement("li");
+            li.textContent = item;
+            listEl.appendChild(li);
+          });
+          sectionEl.appendChild(listEl);
+          details.appendChild(sectionEl);
+        });
+
+        if (fullDetailsText) {
+          const fullDetails = document.createElement("p");
+          fullDetails.className = "drill-details-full";
+          fullDetails.textContent = fullDetailsText;
+          details.appendChild(fullDetails);
+        }
+
+        const setExpanded = (expanded) => {
+          detailsToggle.setAttribute("aria-expanded", expanded ? "true" : "false");
+          drillBlock.classList.toggle("expanded", expanded);
+          details.classList.toggle("open", expanded);
+          if (expanded) expandedDrillBlock = drillBlock;
+          else if (expandedDrillBlock === drillBlock) expandedDrillBlock = null;
+        };
+        drillBlock._setExpanded = setExpanded;
+
+        const toggleDetails = () => {
+          const willExpand = detailsToggle.getAttribute("aria-expanded") !== "true";
+          if (willExpand && expandedDrillBlock && expandedDrillBlock !== drillBlock && typeof expandedDrillBlock._setExpanded === "function") {
+            expandedDrillBlock._setExpanded(false);
+          }
+          setExpanded(willExpand);
+        };
+
+        detailsToggle.addEventListener("click", toggleDetails);
+        detailsToggle.addEventListener("keydown", (e) => {
+          if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
+            toggleDetails();
+          }
+        });
+        nameBtn.addEventListener("click", () => {
+          if (drillMatch) {
             openDrillModal(drillMatch);
-          });
-          topRow.appendChild(link);
-        } else {
-          const name = document.createElement("span");
-          name.className = "drill-link";
-          name.textContent = drillName || bulletText;
-          topRow.appendChild(name);
-        }
+            return;
+          }
+          toggleDetails();
+        });
 
-        if (detailsText) {
-          const detailId = `drill-details-${wi}-${si}-${body.children.length}`;
-          const detailsToggle = document.createElement("button");
-          detailsToggle.type = "button";
-          detailsToggle.className = "drill-details-toggle";
-          detailsToggle.setAttribute("aria-expanded", "false");
-          detailsToggle.setAttribute("aria-controls", detailId);
-          detailsToggle.innerHTML = '<span>Details</span><span class="chev">&#9662;</span>';
-
-          const details = document.createElement("div");
-          details.className = "drill-details";
-          details.id = detailId;
-          details.textContent = detailsText;
-
-          detailsToggle.addEventListener("click", () => {
-            const expanded = detailsToggle.getAttribute("aria-expanded") === "true";
-            detailsToggle.setAttribute("aria-expanded", expanded ? "false" : "true");
-            details.classList.toggle("open", !expanded);
-          });
-
-          topRow.appendChild(detailsToggle);
-          content.appendChild(topRow);
-
-          const meta = document.createElement("div");
-          meta.className = "drill-meta";
-          meta.textContent = metaText;
-          content.appendChild(meta);
-          content.appendChild(details);
-        } else {
-          content.appendChild(topRow);
-          const meta = document.createElement("div");
-          meta.className = "drill-meta";
-          meta.textContent = metaText;
-          content.appendChild(meta);
-        }
-
-        drillBlock.appendChild(content);
-
+        drillBlock.appendChild(summary);
+        drillBlock.appendChild(details);
         body.appendChild(drillBlock);
       });
 
