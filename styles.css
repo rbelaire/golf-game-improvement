@@ -835,6 +835,112 @@ input.routine-title:focus {
   gap: 1rem;
 }
 
+.routine-library-top-actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.routine-create-flow-head {
+  margin-bottom: var(--space-3);
+}
+
+.routine-card.library-mode .routine-header,
+.routine-card.library-mode .routine-actions {
+  display: none;
+}
+
+.routine-library-item {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--card-bg);
+  overflow: hidden;
+  transition: border-color var(--transition-fast), background var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.routine-library-item:hover,
+.routine-library-item:focus-within {
+  border-color: rgba(76, 175, 80, 0.45);
+  background: var(--card-glass);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.16);
+}
+
+.routine-library-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3);
+}
+
+.routine-library-title {
+  margin: 0;
+  font: 700 1.02rem "Rajdhani", sans-serif;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.routine-library-meta {
+  margin: var(--space-1) 0 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.routine-library-chip-row {
+  margin-top: var(--space-2);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.routine-library-chip {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--card-glass);
+  padding: 3px 9px;
+  font-size: var(--text-xs);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.routine-library-stats {
+  margin-top: var(--space-2);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.routine-library-stat {
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--radius-pill);
+  background: rgba(76, 175, 80, 0.12);
+  border: 1px solid rgba(76, 175, 80, 0.28);
+  color: var(--text);
+  padding: 3px 9px;
+  font-size: var(--text-xs);
+}
+
+.routine-library-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.routine-library-body {
+  border-top: 1px solid var(--line);
+  padding: var(--space-3);
+  display: grid;
+  gap: var(--space-3);
+  background: var(--card-glass);
+}
+
 .routine-title {
   margin: 0;
   color: var(--text);
@@ -850,6 +956,38 @@ input.routine-title:focus {
 .routine-weeks {
   display: grid;
   gap: 0.9rem;
+}
+
+.routine-block-hint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--card-glass);
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.routine-block-hint-dismiss {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  line-height: 1;
+  font-size: 1rem;
+  padding: 0;
+}
+
+.routine-block-hint-dismiss:hover,
+.routine-block-hint-dismiss:focus-visible {
+  color: var(--text);
+  border-color: var(--green);
 }
 
 .week-block {
@@ -3430,6 +3568,18 @@ a {
 
   .home-qa-btn {
     min-width: unset;
+  }
+
+  .routine-library-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .routine-library-actions {
+    justify-content: flex-start;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
   }
 
   .home-recent-card {

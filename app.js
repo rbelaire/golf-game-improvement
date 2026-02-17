@@ -33,6 +33,11 @@ const customRoutineView = document.getElementById("customRoutineView");
 const planGeneratedView = document.getElementById("planGeneratedView");
 const planSegGenerated = document.getElementById("planSegGenerated");
 const planSegCustom = document.getElementById("planSegCustom");
+const routineLibraryActions = document.getElementById("routineLibraryActions");
+const openGenerateFlowBtn = document.getElementById("openGenerateFlowBtn");
+const openCustomFlowBtn = document.getElementById("openCustomFlowBtn");
+const routineCreateFlowHeader = document.getElementById("routineCreateFlowHeader");
+const closeRoutineCreateFlowBtn = document.getElementById("closeRoutineCreateFlowBtn");
 const planPanelTitle = document.getElementById("planPanelTitle");
 const userMenuWrap = document.getElementById("userMenuWrap");
 const userMenuBtn = document.getElementById("userMenuBtn");
@@ -152,6 +157,9 @@ const FREE_ROUTINE_LIMIT = 5;
 const ONBOARDING_ENABLED = false;
 let authGateCallback = null;
 let authGateRegisterMode = false;
+const ROUTINE_BLOCK_HINT_KEY_PREFIX = "thegolfbuild_routine_block_hint_seen_v1";
+let expandedRoutineLibraryKey = null;
+let routineCreateFlowMode = null; // null | "generated" | "custom"
 
 function setOverlayVisible(el, visible) {
   if (!el) return;
@@ -498,7 +506,7 @@ function openDrillModal(drill) {
   drillModalBadges.innerHTML = "";
   const typeBadge = document.createElement("span");
   typeBadge.className = `modal-badge type-${drill.type}`;
-  typeBadge.textContent = drill.type;
+  typeBadge.textContent = normalizeBlockLabel(drill.type);
   drillModalBadges.appendChild(typeBadge);
 
   drill.levels.forEach((lvl) => {
@@ -707,6 +715,49 @@ function routinesCacheKey(userId) {
   return `thegolfbuild_routines_${userId}`;
 }
 
+function routineBlockHintKey(userId) {
+  return `${ROUTINE_BLOCK_HINT_KEY_PREFIX}_${userId || "guest"}`;
+}
+
+function hasSeenRoutineBlockHint(userId) {
+  try {
+    return localStorage.getItem(routineBlockHintKey(userId)) === "1";
+  } catch (_err) {
+    return false;
+  }
+}
+
+function markRoutineBlockHintSeen(userId) {
+  try {
+    localStorage.setItem(routineBlockHintKey(userId), "1");
+  } catch (_err) {
+    // ignore localStorage write failures
+  }
+}
+
+function maybeRenderRoutineBlockHint() {
+  const mobileOnly = typeof window !== "undefined" && typeof window.matchMedia === "function"
+    ? window.matchMedia("(max-width: 900px), (pointer: coarse)").matches
+    : false;
+  if (!mobileOnly) return null;
+
+  const userId = currentUser?.id;
+  if (hasSeenRoutineBlockHint(userId)) return null;
+
+  const hint = document.createElement("div");
+  hint.className = "routine-block-hint";
+  hint.innerHTML = `
+    <span>Tap a block to see details</span>
+    <button class="routine-block-hint-dismiss" type="button" aria-label="Dismiss hint">&times;</button>
+  `;
+  hint.querySelector(".routine-block-hint-dismiss").addEventListener("click", () => {
+    markRoutineBlockHintSeen(userId);
+    hint.remove();
+  });
+  routineWeeks.appendChild(hint);
+  return hint;
+}
+
 function getCachedRoutines(userId) {
   if (!userId) return null;
   try {
@@ -847,6 +898,43 @@ function setPlanSubmode(submode) {
   }
 }
 
+function setRoutineCreateFlow(mode) {
+  routineCreateFlowMode = mode || null;
+  const inFlow = Boolean(routineCreateFlowMode);
+
+  routineLibraryActions?.classList.toggle("hidden", inFlow);
+  routineCreateFlowHeader?.classList.toggle("hidden", !inFlow);
+
+  if (!inFlow) {
+    setPlanSubmode("generated");
+    planGeneratedView.classList.remove("hidden");
+    customRoutineView.classList.add("hidden");
+    profileSummary.classList.add("hidden");
+    profileFormWrap.classList.add("hidden");
+    generatedRoutineView.classList.remove("hidden");
+    return;
+  }
+
+  if (routineCreateFlowMode === "generated") {
+    setPlanSubmode("generated");
+    planGeneratedView.classList.remove("hidden");
+    customRoutineView.classList.add("hidden");
+    profileFormWrap.classList.remove("hidden");
+    generatedRoutineView.classList.add("hidden");
+
+    const profile = currentUser ? getCachedProfile(currentUser.id) : null;
+    if (isProfileComplete(profile || {})) {
+      renderProfileSummary(profile);
+    } else {
+      profileSummary.classList.add("hidden");
+      profileFormWrap.classList.remove("collapsed");
+    }
+    return;
+  }
+
+  setPlanSubmode("custom");
+}
+
 function updateSelectedDrillsBtn() {
   if (!selectedDrillsBtn) return;
   const count = selectedDrillsStore?.getSelectedDrillIds()?.length || 0;
@@ -879,7 +967,7 @@ function setPlanMode(mode) {
 
   showHomeBtn.classList.remove("active");
   showGeneratedRoutineBtn.classList.remove("active");
-  showCustomRoutineBtn.classList.remove("active");
+  showCustomRoutineBtn?.classList.remove("active");
   showDrillLibraryBtn.classList.remove("active");
   showStatsBtn.classList.remove("active");
 
@@ -888,10 +976,10 @@ function setPlanMode(mode) {
     showHomeBtn.classList.add("active");
     renderHomeDashboard();
   } else if (mode === "custom") {
-    // "custom" deep-link: show plan panel and switch to custom submode
+    // Legacy "custom" routes now map to Routine tab and open custom create flow.
     planPanel.classList.remove("hidden");
     showGeneratedRoutineBtn.classList.add("active");
-    setPlanSubmode("custom");
+    setRoutineCreateFlow("custom");
   } else if (mode === "drills") {
     drillLibraryPanel.classList.remove("hidden");
     showDrillLibraryBtn.classList.add("active");
@@ -902,11 +990,11 @@ function setPlanMode(mode) {
     showStatsBtn.classList.add("active");
     loadStats();
   } else {
-    // "generated" and any other value → plan panel, restore last submode
+    // "generated" and any other value → plan panel library view
     planPanel.classList.remove("hidden");
     showGeneratedRoutineBtn.classList.add("active");
-    const savedSub = (() => { try { return localStorage.getItem(PLAN_SUBMODE_KEY); } catch (_) { return null; } })();
-    setPlanSubmode(savedSub || "generated");
+    setRoutineCreateFlow(null);
+    renderRoutine();
   }
   updateEmptyState();
 }
@@ -1091,14 +1179,15 @@ function renderTodayTrainingCard() {
     const type = parseBulletType(b);
     const bulletText = b.replace(/^\d+\s*min\s*[–-]?\s*/, "").trim();
     const drillMatch = drillLibraryCache ? drillLibraryCache.find((d) => bulletText.includes(d.name)) : null;
-    const drillName = drillMatch ? drillMatch.name : bulletText.split(/[–—:-]/)[0].trim();
-    const detailTextRaw = drillName ? bulletText.replace(drillName, "").replace(/^[\s:–—-]+/, "").trim() : bulletText;
+    const rawDrillName = drillMatch ? drillMatch.name : bulletText.split(/[–—:-]/)[0].trim();
+    const drillName = drillMatch ? rawDrillName : normalizeBlockLabel(rawDrillName);
+    const detailTextRaw = rawDrillName ? bulletText.replace(rawDrillName, "").replace(/^[\s:–—-]+/, "").trim() : bulletText;
     const metaTags = buildDrillMetaTags(`${detailTextRaw}. ${drillMatch?.description || ""}`, type);
 
     return {
       idx,
       type,
-      durationLabel: duration ? duration.toUpperCase() : (mins > 0 ? `${mins} MIN` : type.toUpperCase()),
+      durationLabel: duration ? duration.toUpperCase() : (mins > 0 ? `${mins} MIN` : normalizeBlockLabel(type)),
       name: drillName || bulletText || "Drill",
       meta: metaTags.join(" • "),
       drill: drillMatch || {
@@ -1235,11 +1324,16 @@ function renderRunnerUI() {
     const drillMatch = drillLibraryCache
       ? drillLibraryCache.find(d => drillText.includes(d.name))
       : null;
+    const leadLabel = drillText.split(/[–—:]/)[0].trim();
+    const normalizedLead = normalizeBlockLabel(leadLabel);
+    const displayDrillText = !drillMatch && normalizedLead && leadLabel
+      ? drillText.replace(leadLabel, normalizedLead)
+      : drillText;
 
     row.innerHTML = `
       <input class="runner-drill-cb" type="checkbox" id="runner-drill-${i}" ${checked ? "checked" : ""}>
       <span class="runner-drill-info">
-        <span class="runner-drill-name">${drillText}</span>
+        <span class="runner-drill-name">${displayDrillText}</span>
         ${drillMatch ? `<button class="btn btn-ghost runner-view-btn" type="button" data-drill-i="${i}">View drill</button>` : ""}
       </span>
       <span class="runner-drill-dur">${mins > 0 ? mins + "m" : ""}</span>`;
@@ -1636,6 +1730,36 @@ function parseBulletType(bullet) {
   return "technical";
 }
 
+function normalizeBlockLabel(raw) {
+  const cleaned = String(raw || "")
+    .trim()
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+  if (!cleaned) return "";
+
+  const canonicalMap = {
+    "warmup": "Warm-Up",
+    "warm up": "Warm-Up",
+    "warm up block": "Warm-Up",
+    "technical": "Technical Block",
+    "technical block": "Technical Block",
+    "pressure": "Pressure Block",
+    "pressure block": "Pressure Block",
+    "transfer": "Transfer Block",
+    "transfer block": "Transfer Block",
+    "reflection": "Reflection",
+    "reflection block": "Reflection"
+  };
+
+  if (canonicalMap[cleaned]) return canonicalMap[cleaned];
+
+  return cleaned
+    .split(" ")
+    .map((word) => word ? word.charAt(0).toUpperCase() + word.slice(1) : word)
+    .join(" ");
+}
+
 function parseBulletDuration(bullet) {
   const match = bullet.match(/^(\d+)\s*min/);
   return match ? match[1] + " min" : "";
@@ -1768,27 +1892,44 @@ function buildDrillDetailsSections(detailText, drillDescription, type, duration,
   };
 }
 
-function renderRoutine(routine) {
-  if (!routine) {
-    routineCard.classList.add("hidden");
-    routineEmptyState.classList.remove("hidden");
-    routineWeeks.innerHTML = "";
-    routineTitleInput.value = "";
-    return;
+function routineLibraryKey(routine) {
+  return routine?.id || "__draft";
+}
+
+function getRoutineLibraryItems() {
+  const items = [...savedRoutines];
+  if (currentRoutine && !currentRoutine.id) {
+    items.unshift(currentRoutine);
   }
+  return items.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+}
 
-  routineTitleInput.value = routine.title;
-  routineMeta.textContent = `${routine.meta} • Created ${new Date(routine.createdAt || Date.now()).toLocaleDateString()}`;
+function getRoutineLibraryChips(routine) {
+  const profile = routine?.profileSnapshot || {};
+  const chips = [];
 
+  const level = String(profile.handicap || "").trim().replace(/\s*\(.*\)/, "");
+  if (level) chips.push(level);
+
+  const weaknesses = Array.isArray(profile.weaknesses) ? profile.weaknesses : (profile.weakness ? [profile.weakness] : []);
+  if (weaknesses.length) chips.push(weaknesses.slice(0, 2).join(" + "));
+
+  const days = Number(profile.daysPerWeek);
+  if (Number.isFinite(days) && days > 0) chips.push(`${days}d/wk`);
+
+  const hours = Number(profile.hoursPerSession);
+  if (Number.isFinite(hours) && hours > 0) chips.push(`${Math.round(hours * 60)} min/session`);
+
+  return chips.slice(0, 4);
+}
+
+function renderRoutineWeeksInto(container, routine, onDrillDetailExpand) {
   const completions = routine.completions || {};
   const isSaved = Boolean(routine.id);
-  saveRoutineBtn.textContent = isSaved ? "Update Routine" : "Save to Profile";
-
-  // Pre-compute next incomplete session key so we can highlight it in the list
   const nextIncomplete = isSaved ? getNextIncompleteSession(routine) : null;
   const nextKey = nextIncomplete ? nextIncomplete.key : null;
 
-  routineWeeks.innerHTML = "";
+  container.innerHTML = "";
   routine.weeks.forEach((week, wi) => {
     const block = document.createElement("section");
     block.className = "week-block";
@@ -1892,12 +2033,13 @@ function renderRoutine(routine) {
         const duration = parseBulletDuration(bullet);
         const durationPill = document.createElement("span");
         durationPill.className = `drill-duration-pill ${type}`;
-        durationPill.textContent = duration ? duration.toUpperCase() : type.toUpperCase();
+        durationPill.textContent = duration ? duration.toUpperCase() : normalizeBlockLabel(type);
 
         const bulletText = bullet.replace(/^\d+\s*min\s*[–—-]?\s*/, "").trim();
         const drillMatch = drillLibraryCache ? drillLibraryCache.find((d) => bulletText.includes(d.name)) : null;
-        const drillName = drillMatch ? drillMatch.name : bulletText.split(/[–—:-]/)[0].trim();
-        const detailTextRaw = drillName ? bulletText.replace(drillName, "").replace(/^[\s:–—-]+/, "").trim() : bulletText;
+        const rawDrillName = drillMatch ? drillMatch.name : bulletText.split(/[–—:-]/)[0].trim();
+        const drillName = drillMatch ? rawDrillName : normalizeBlockLabel(rawDrillName);
+        const detailTextRaw = rawDrillName ? bulletText.replace(rawDrillName, "").replace(/^[\s:–—-]+/, "").trim() : bulletText;
         const drillDescription = drillMatch?.description || "";
         const detailSections = buildDrillDetailsSections(detailTextRaw, drillDescription, type, duration, drillName);
         const metaTags = buildDrillMetaTags(`${detailTextRaw}. ${drillDescription}`, type);
@@ -1913,6 +2055,15 @@ function renderRoutine(routine) {
         const main = document.createElement("div");
         main.className = "drill-main";
 
+        const detailId = `drill-details-${wi}-${si}-${bi}`;
+        const blockLabelToggle = document.createElement("button");
+        blockLabelToggle.type = "button";
+        blockLabelToggle.className = "drill-block-label-toggle";
+        blockLabelToggle.setAttribute("aria-expanded", "false");
+        blockLabelToggle.setAttribute("aria-controls", detailId);
+        blockLabelToggle.innerHTML = `<span class="label">${normalizeBlockLabel(type)}</span><span class="chev" aria-hidden="true">&#9662;</span>`;
+        main.appendChild(blockLabelToggle);
+
         const nameBtn = document.createElement("button");
         nameBtn.type = "button";
         nameBtn.className = "drill-name-btn";
@@ -1925,7 +2076,6 @@ function renderRoutine(routine) {
         main.appendChild(meta);
         summary.appendChild(main);
 
-        const detailId = `drill-details-${wi}-${si}-${bi}`;
         const detailsToggle = document.createElement("button");
         detailsToggle.type = "button";
         detailsToggle.className = "drill-details-toggle";
@@ -1970,6 +2120,7 @@ function renderRoutine(routine) {
         }
 
         const setExpanded = (expanded) => {
+          blockLabelToggle.setAttribute("aria-expanded", expanded ? "true" : "false");
           detailsToggle.setAttribute("aria-expanded", expanded ? "true" : "false");
           drillBlock.classList.toggle("expanded", expanded);
           details.classList.toggle("open", expanded);
@@ -1983,9 +2134,11 @@ function renderRoutine(routine) {
           if (willExpand && expandedDrillBlock && expandedDrillBlock !== drillBlock && typeof expandedDrillBlock._setExpanded === "function") {
             expandedDrillBlock._setExpanded(false);
           }
+          if (willExpand && typeof onDrillDetailExpand === "function") onDrillDetailExpand();
           setExpanded(willExpand);
         };
 
+        blockLabelToggle.addEventListener("click", toggleDetails);
         detailsToggle.addEventListener("click", toggleDetails);
         detailsToggle.addEventListener("keydown", (e) => {
           if (e.key === "Enter" || e.key === " ") {
@@ -2048,12 +2201,12 @@ function renderRoutine(routine) {
       });
     }
 
-    routineWeeks.appendChild(block);
+    container.appendChild(block);
   });
 
   // Auto-collapse completed weeks: expand only the first incomplete week
   if (isSaved) {
-    const weekBlocks = routineWeeks.querySelectorAll(".week-block");
+    const weekBlocks = container.querySelectorAll(".week-block");
     let expandedOne = false;
     weekBlocks.forEach((block, wi) => {
       const week = routine.weeks[wi];
@@ -2074,9 +2227,135 @@ function renderRoutine(routine) {
       weekBlocks[weekBlocks.length - 1].classList.remove("collapsed");
     }
   }
+}
+
+function renderRoutine(routine) {
+  if (routine) {
+    currentRoutine = routine;
+    expandedRoutineLibraryKey = routineLibraryKey(routine);
+  }
+
+  const routines = getRoutineLibraryItems();
+  if (routines.length === 0) {
+    routineCard.classList.add("hidden");
+    routineEmptyState.classList.remove("hidden");
+    routineWeeks.innerHTML = "";
+    routineTitleInput.value = "";
+    expandedRoutineLibraryKey = null;
+    return;
+  }
 
   routineCard.classList.remove("hidden");
   routineEmptyState.classList.add("hidden");
+  routineCard.classList.add("library-mode");
+  routineWeeks.innerHTML = "";
+
+  if (!routines.some((r) => routineLibraryKey(r) === expandedRoutineLibraryKey)) {
+    expandedRoutineLibraryKey = null;
+  }
+
+  let routineHintEl = maybeRenderRoutineBlockHint();
+
+  routines.forEach((r) => {
+    const key = routineLibraryKey(r);
+    const prog = routineProgress(r);
+    const weekCount = (r.weeks || []).length;
+    const sessionCount = (r.weeks || []).reduce((sum, week) => sum + ((week.sessions || []).length), 0);
+    const createdLabel = new Date(r.createdAt || Date.now()).toLocaleDateString();
+    const metaChips = getRoutineLibraryChips(r);
+    const isExpanded = expandedRoutineLibraryKey === key;
+    const isDraft = !r.id;
+
+    const card = document.createElement("article");
+    card.className = "routine-library-item" + (isExpanded ? " expanded" : "");
+
+    const header = document.createElement("div");
+    header.className = "routine-library-head";
+    header.innerHTML = `
+      <div class="routine-library-title-wrap">
+        <h3 class="routine-library-title">${r.title || "Untitled Routine"}</h3>
+        <div class="routine-library-chip-row">
+          ${metaChips.map((chip) => `<span class="routine-library-chip">${chip}</span>`).join("")}
+        </div>
+        <div class="routine-library-stats">
+          <span class="routine-library-stat">${prog.done}/${prog.total} sessions</span>
+          <span class="routine-library-stat">${prog.pct}% complete</span>
+          <span class="routine-library-stat">${weekCount} weeks</span>
+          <span class="routine-library-stat">Created ${createdLabel}</span>
+        </div>
+      </div>
+      <div class="routine-library-actions">
+        <button class="btn btn-outline btn-sm view-btn" type="button">${isExpanded ? "Hide" : "View"}</button>
+        ${isDraft ? '<button class="btn btn-primary btn-sm save-btn" type="button">Save to Profile</button>' : ""}
+        ${r.id ? '<button class="btn btn-outline btn-sm export-btn" type="button">Export</button>' : ""}
+        ${r.id ? '<button class="btn btn-danger btn-sm delete-btn" type="button">Delete</button>' : ""}
+      </div>
+    `;
+
+    const viewBtn = header.querySelector(".view-btn");
+    viewBtn.addEventListener("click", () => {
+      expandedRoutineLibraryKey = isExpanded ? null : key;
+      currentRoutine = r;
+      routineTitleInput.value = r.title || "";
+      routineMeta.textContent = `${r.meta || ""} • Created ${createdLabel}`;
+      renderRoutine();
+    });
+
+    const saveBtn = header.querySelector(".save-btn");
+    if (saveBtn) {
+      saveBtn.addEventListener("click", () => {
+        currentRoutine = r;
+        routineTitleInput.value = r.title || "";
+        saveRoutineBtn.click();
+      });
+    }
+
+    const exportBtn = header.querySelector(".export-btn");
+    if (exportBtn) {
+      exportBtn.addEventListener("click", () => {
+        currentRoutine = r;
+        routineTitleInput.value = r.title || "";
+        exportPdfBtn?.click();
+      });
+    }
+
+    const deleteBtn = header.querySelector(".delete-btn");
+    if (deleteBtn) {
+      deleteBtn.addEventListener("click", () => {
+        openConfirmModal("Delete Routine", `Are you sure you want to delete "${r.title}"? This cannot be undone.`, async () => {
+          try {
+            await api(`/api/routines/${r.id}`, { method: "DELETE" });
+            savedRoutines = savedRoutines.filter((item) => item.id !== r.id);
+            setCachedRoutines(currentUser?.id, savedRoutines);
+            if (currentRoutine?.id === r.id) currentRoutine = null;
+            if (expandedRoutineLibraryKey === key) expandedRoutineLibraryKey = null;
+            renderRoutine();
+            if (activePlanMode === "home") renderHomeDashboard();
+          } catch (err) {
+            setMessage(err.message, true);
+          }
+        });
+      });
+    }
+
+    card.appendChild(header);
+
+    if (isExpanded) {
+      const body = document.createElement("div");
+      body.className = "routine-library-body";
+      renderRoutineWeeksInto(body, r, () => {
+        if (routineHintEl) {
+          markRoutineBlockHintSeen(currentUser?.id);
+          routineHintEl.remove();
+          routineHintEl = null;
+        }
+      });
+      card.appendChild(body);
+    }
+
+    routineWeeks.appendChild(card);
+  });
+
   updateEmptyState();
 }
 
@@ -2426,15 +2705,21 @@ submitPasswordChangeBtn.addEventListener("click", async () => {
 showHomeBtn.addEventListener("click", () => setPlanMode("home"));
 showGeneratedRoutineBtn.addEventListener("click", () => {
   setPlanMode("generated");
-  // Routine tab defaults to Generated only when a generated routine currently exists.
-  setPlanSubmode(currentRoutine ? "generated" : "custom");
+  expandedRoutineLibraryKey = null;
 });
-showCustomRoutineBtn.addEventListener("click", () => setPlanMode("custom"));
+showCustomRoutineBtn?.addEventListener("click", () => setPlanMode("custom"));
 showDrillLibraryBtn.addEventListener("click", () => setPlanMode("drills"));
 showStatsBtn.addEventListener("click", () => setPlanMode("stats"));
+openGenerateFlowBtn?.addEventListener("click", () => setRoutineCreateFlow("generated"));
+openCustomFlowBtn?.addEventListener("click", () => setRoutineCreateFlow("custom"));
+closeRoutineCreateFlowBtn?.addEventListener("click", () => {
+  setRoutineCreateFlow(null);
+  renderRoutine();
+});
 selectedDrillsBtn?.addEventListener("click", () => {
   if (selectedDrillsBtn.disabled) return;
-  setPlanMode("custom");
+  setPlanMode("generated");
+  setRoutineCreateFlow("custom");
   setTimeout(() => {
     customRoutineView?.scrollIntoView({ behavior: "smooth", block: "start" });
     const focusTarget = document.getElementById("customTitle") || document.getElementById("customDrillSearch");
@@ -2569,9 +2854,9 @@ profileForm.addEventListener("submit", (event) => {
       });
       currentRoutine = generation.routine;
       renderRoutine(currentRoutine);
-      renderProfileSummary(profile);
+      setRoutineCreateFlow(null);
       updateEmptyState();
-      setMessage("Routine generated from your handicap, selected weaknesses, and weekly schedule. Save it when ready.");
+      setMessage("Routine generated. Tap Save to add it to My Routines.");
     } catch (err) {
       setMessage(err.message, true);
     } finally {
@@ -2612,8 +2897,10 @@ saveRoutineBtn.addEventListener("click", () => {
         currentRoutine = result.routine;
         setCachedRoutines(currentUser?.id, savedRoutines);
         renderSavedRoutines();
-        renderRoutine(currentRoutine);
-        setMessage("Routine updated.");
+        setRoutineCreateFlow(null);
+        expandedRoutineLibraryKey = null;
+        renderRoutine();
+        setMessage("Routine saved.");
       } else {
         // Create new routine
         const routineToSave = customSaveName
@@ -2629,8 +2916,10 @@ saveRoutineBtn.addEventListener("click", () => {
         currentRoutine = result.routine;
         setCachedRoutines(currentUser?.id, savedRoutines);
         renderSavedRoutines();
-        renderRoutine(currentRoutine);
-        setMessage("Routine saved to your profile.");
+        setRoutineCreateFlow(null);
+        expandedRoutineLibraryKey = null;
+        renderRoutine();
+        setMessage("Routine saved.");
       }
     } catch (err) {
       if (err.code === "UPGRADE_REQUIRED") {
@@ -2742,7 +3031,7 @@ function renderDrillLibrary(drills) {
       li.setAttribute("draggable", "true");
       li.dataset.drillId = drill.id;
       li.innerHTML = `<p class="drill-item-name">${drill.name}</p>` +
-        `<p class="drill-item-tags">${drill.type} • ${drill.levels.join(", ")}</p>` +
+        `<p class="drill-item-tags">${normalizeBlockLabel(drill.type)} • ${drill.levels.join(", ")}</p>` +
         `<p class="drill-item-desc">${drill.description}</p>`;
       li.addEventListener("click", (e) => {
         if (e.target.closest(".drill-item-name")) {
@@ -2781,7 +3070,7 @@ function renderDrillLibrary(drills) {
       li.setAttribute("draggable", "true");
       li.dataset.drillId = drill.id;
       li.innerHTML = `<p class="drill-item-name">${drill.name}</p>` +
-        `<p class="drill-item-tags">${drill.type} • ${drill.levels.join(", ")}</p>` +
+        `<p class="drill-item-tags">${normalizeBlockLabel(drill.type)} • ${drill.levels.join(", ")}</p>` +
         `<p class="drill-item-desc">${drill.description}</p>`;
       li.addEventListener("click", (e) => {
         if (e.target.closest(".drill-item-name")) {
@@ -3326,7 +3615,7 @@ function renderCustomSessionItems() {
     el.dataset.dragIdx = idx;
 
     const chipClass = item.type === "drill" ? (item.drillType || "technical") : "reflection";
-    const chipLabel = item.type === "drill" ? (item.drillType || "drill") : "custom";
+    const chipLabel = item.type === "drill" ? normalizeBlockLabel(item.drillType || "drill") : "Custom";
 
     el.innerHTML = `
       <span class="drag-handle" title="Drag to reorder">&#8801;</span>
@@ -3423,7 +3712,7 @@ document.getElementById("customDrillSearch").addEventListener("input", (e) => {
     row.innerHTML = `
       <div class="custom-drill-result-info">
         <p class="custom-drill-result-name">${drill.name}</p>
-        <p class="custom-drill-result-meta">${drill.type} &middot; ${drill.levels.join(", ")}</p>
+        <p class="custom-drill-result-meta">${normalizeBlockLabel(drill.type)} &middot; ${drill.levels.join(", ")}</p>
       </div>
       <button class="btn btn-outline btn-sm" type="button">+ Add</button>
     `;
@@ -3562,7 +3851,7 @@ document.getElementById("customCreateBtn").addEventListener("click", () => {
     customBuilderState = null;
     customActiveSessionIndex = 0;
     setPlanMode("generated");
-    showToast("Custom routine created. Save it to your profile.");
+    showToast("Custom routine created. Tap Save to add it to My Routines.");
   });
 });
 

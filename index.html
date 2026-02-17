@@ -105,9 +105,6 @@
       <button id="showGeneratedRoutineBtn" class="tab-btn" type="button">
         <span class="tab-icon">&#9776;</span><span class="tab-label">Routine</span>
       </button>
-      <button id="showCustomRoutineBtn" class="tab-btn" type="button">
-        <span class="tab-icon">&#9998;</span><span class="tab-label">Custom</span>
-      </button>
       <button id="showDrillLibraryBtn" class="tab-btn" type="button">
         <span class="tab-icon">&#9863;</span><span class="tab-label">Drills</span>
       </button>
@@ -203,10 +200,18 @@
       <section class="panel plan-panel">
         <h2 id="planPanelTitle" class="sr-only">Practice Routine</h2>
 
-        <!-- Plan tab segmented control -->
-        <div class="segmented-control plan-seg" id="planSegControl" role="tablist">
+        <!-- Plan tab segmented control (kept for compatibility, hidden in library-first UI) -->
+        <div class="segmented-control plan-seg hidden" id="planSegControl" role="tablist">
           <button class="seg-btn active" id="planSegGenerated" type="button" role="tab" aria-selected="true">Generated</button>
           <button class="seg-btn" id="planSegCustom" type="button" role="tab" aria-selected="false">Custom</button>
+        </div>
+
+        <div id="routineLibraryActions" class="routine-library-top-actions">
+          <button id="openGenerateFlowBtn" class="btn btn-primary" type="button">Generate New Routine</button>
+          <button id="openCustomFlowBtn" class="btn btn-outline" type="button">Create Custom Routine</button>
+        </div>
+        <div id="routineCreateFlowHeader" class="routine-create-flow-head hidden">
+          <button id="closeRoutineCreateFlowBtn" class="btn btn-outline btn-sm" type="button">&#8592; Back to My Routines</button>
         </div>
 
         <!-- Generated mode wrapper -->
