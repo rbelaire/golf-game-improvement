@@ -420,6 +420,7 @@
         <div class="drill-search-bar">
           <input type="text" id="drillSearchInput" placeholder="Search drills..." />
           <p id="drillResultCount" class="drill-result-count"></p>
+          <button id="selectedDrillsBtn" class="btn btn-outline drill-selected-chip" type="button" disabled>Selected (0)</button>
         </div>
         <div class="drill-filter-row">
           <div class="drill-filter-group">
@@ -483,6 +484,7 @@
         <h3 id="drillModalName"></h3>
         <div id="drillModalBadges" class="modal-badges"></div>
         <p id="drillModalDesc" class="modal-desc"></p>
+        <div id="drillModalActions" class="cta-row"></div>
         <div id="drillModalSwap" class="modal-swap hidden">
           <h4>Swap with</h4>
           <div id="drillModalAlternatives" class="modal-alternatives"></div>
@@ -574,6 +576,7 @@
       </div>
     </div>
 
+    <script src="selected-drills-store.js"></script>
     <script src="app.js"></script>
     <script>
       if ("serviceWorker" in navigator) {

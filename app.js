@@ -2,6 +2,7 @@ const STORAGE_KEYS = {
   token: "thegolfbuild_auth_token",
   legacyTokens: ["under_par_lab_auth_token", "golfos_auth_token"]
 };
+const selectedDrillsStore = window.SelectedDrillsStore || null;
 
 const authStatus = document.getElementById("authStatus");
 const appMessage = document.getElementById("appMessage");
@@ -50,6 +51,7 @@ const confirmModalCancel = document.getElementById("confirmModalCancel");
 
 const drillSearchInput = document.getElementById("drillSearchInput");
 const drillResultCount = document.getElementById("drillResultCount");
+const selectedDrillsBtn = document.getElementById("selectedDrillsBtn");
 const saveRoutineBtn = document.getElementById("saveRoutineBtn");
 const routineTitleInput = document.getElementById("routineTitle");
 const upgradeBtn = document.getElementById("upgradeBtn");
@@ -102,6 +104,7 @@ const drillModalClose = document.getElementById("drillModalClose");
 const drillModalName = document.getElementById("drillModalName");
 const drillModalBadges = document.getElementById("drillModalBadges");
 const drillModalDesc = document.getElementById("drillModalDesc");
+const drillModalActions = document.getElementById("drillModalActions");
 const drillModalSwap = document.getElementById("drillModalSwap");
 const drillModalAlternatives = document.getElementById("drillModalAlternatives");
 const reflectionModal = document.getElementById("reflectionModal");
@@ -467,9 +470,28 @@ function showSkeleton(container, type) {
 }
 
 // ===== Drill Detail Modal =====
+function renderDrillModalActions(drill) {
+  if (!drillModalActions) return;
+  drillModalActions.innerHTML = "";
+
+  const btn = document.createElement("button");
+  const selected = selectedDrillsStore?.isDrillSelected(drill.id);
+  btn.type = "button";
+  btn.className = `btn ${selected ? "btn-danger" : "btn-primary"}`;
+  btn.textContent = selected ? "Remove from Custom Routine" : "Add to Custom Routine";
+  btn.addEventListener("click", () => {
+    if (!selectedDrillsStore || !drill.id) return;
+    selectedDrillsStore.toggleSelectedDrill(drill.id);
+    renderDrillModalActions(drill);
+    updateSelectedDrillsBtn();
+  });
+  drillModalActions.appendChild(btn);
+}
+
 function openDrillModal(drill) {
   drillModalName.textContent = drill.name;
   drillModalDesc.textContent = drill.description;
+  renderDrillModalActions(drill);
 
   drillModalBadges.innerHTML = "";
   const typeBadge = document.createElement("span");
@@ -823,6 +845,16 @@ function setPlanSubmode(submode) {
   }
 }
 
+function updateSelectedDrillsBtn() {
+  if (!selectedDrillsBtn) return;
+  const count = selectedDrillsStore?.getSelectedDrillIds()?.length || 0;
+  selectedDrillsBtn.textContent = `Selected (${count})`;
+  selectedDrillsBtn.disabled = count === 0;
+  selectedDrillsBtn.title = count === 0
+    ? "Select drills first to build a custom routine."
+    : "Open Plan in Custom mode with your selected drills.";
+}
+
 function setPlanMode(mode) {
   activePlanMode = mode;
   const planPanel = document.querySelector(".plan-panel");
@@ -850,6 +882,7 @@ function setPlanMode(mode) {
   } else if (mode === "drills") {
     drillLibraryPanel.classList.remove("hidden");
     showDrillLibraryBtn.classList.add("active");
+    updateSelectedDrillsBtn();
     loadDrillLibrary();
   } else if (mode === "stats") {
     statsPanel.classList.remove("hidden");
@@ -2120,6 +2153,15 @@ showGeneratedRoutineBtn.addEventListener("click", () => setPlanMode("generated")
 showCustomRoutineBtn.addEventListener("click", () => setPlanMode("custom"));
 showDrillLibraryBtn.addEventListener("click", () => setPlanMode("drills"));
 showStatsBtn.addEventListener("click", () => setPlanMode("stats"));
+selectedDrillsBtn?.addEventListener("click", () => {
+  if (selectedDrillsBtn.disabled) return;
+  setPlanMode("custom");
+  setTimeout(() => {
+    customRoutineView?.scrollIntoView({ behavior: "smooth", block: "start" });
+    const focusTarget = document.getElementById("customTitle") || document.getElementById("customDrillSearch");
+    focusTarget?.focus({ preventScroll: true });
+  }, 0);
+});
 
 // Plan tab segmented control
 planSegGenerated.addEventListener("click", () => setPlanSubmode("generated"));
@@ -2811,7 +2853,13 @@ function renderCustomSessionItems() {
 
   container.querySelectorAll(".custom-item-remove").forEach((btn) => {
     btn.addEventListener("click", () => {
-      session.items.splice(Number(btn.dataset.removeIdx), 1);
+      const removeIdx = Number(btn.dataset.removeIdx);
+      const removed = session.items[removeIdx];
+      session.items.splice(removeIdx, 1);
+      if (removed && removed.type === "drill" && removed.drillId) {
+        selectedDrillsStore?.removeSelectedDrill(removed.drillId);
+        updateSelectedDrillsBtn();
+      }
       renderCustomSessionItems();
       renderCustomSessionTabs();
     });
@@ -2917,6 +2965,8 @@ function addDrillToCustomSession(drill) {
     description: drill.description,
     duration: 15
   });
+  selectedDrillsStore?.addSelectedDrill(drill.id);
+  updateSelectedDrillsBtn();
   renderCustomSessionItems();
   renderCustomSessionTabs();
   showToast(`Added "${drill.name}"`);
@@ -3069,6 +3119,7 @@ function initOnboarding() {
 
 (async function init() {
   initOnboarding();
+  updateSelectedDrillsBtn();
   setPlanMode("home");
   updateAuthUi();
 
