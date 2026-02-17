@@ -3951,13 +3951,7 @@ function initOnboarding() {
   });
 }
 
-function registerServiceWorker() {
-  if (!("serviceWorker" in navigator)) return;
-  navigator.serviceWorker.register("/sw.js").catch(() => {});
-}
-
 (async function init() {
-  registerServiceWorker();
   initOnboarding();
   updateSelectedDrillsBtn();
   setPlanMode("home");

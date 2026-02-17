@@ -808,12 +808,6 @@ function handleStatic(req, res, url) {
     path.join(__dirname, decodedPath),
     path.join(__dirname, "public", decodedPath)
   ];
-  const fileName = path.basename(decodedPath);
-  const looksLikeAsset = /\.(css|js|svg|png|webmanifest|txt|xml|json)$/i.test(fileName);
-  if (looksLikeAsset) {
-    candidates.push(path.join(__dirname, fileName));
-    candidates.push(path.join(__dirname, "public", fileName));
-  }
   const filePath = candidates.find((candidate) => isSafeStaticPath(candidate) && fs.existsSync(candidate) && !fs.statSync(candidate).isDirectory());
 
   if (!filePath) {
