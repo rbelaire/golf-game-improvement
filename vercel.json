@@ -1,20 +1,5 @@
 {
-  "headers": [
-    {
-      "source": "/sw.js",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "no-cache, no-store, must-revalidate"
-        }
-      ]
-    }
-  ],
   "rewrites": [
-    {
-      "source": "/index.html",
-      "destination": "/api/index.js"
-    },
     {
       "source": "/",
       "destination": "/api/index.js"
